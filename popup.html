@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sether Shield</title>
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body {
+        width: 300px; margin: 0; padding: 16px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        color: #18181b; background: #fff;
+      }
+      .head { display: flex; align-items: center; gap: 9px; }
+      .head .badge { display: block; width: 32px; height: 32px; border-radius: 9px; object-fit: cover; }
+      .head h1 { font-size: 15px; margin: 0; font-weight: 700; }
+      .head .sub { font-size: 11px; color: #a1a1aa; }
+      .row { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding: 12px; border: 1px solid #e4e4e7; border-radius: 12px; }
+      .row .label { font-weight: 600; font-size: 13px; }
+      .row .state { font-size: 11px; color: #a1a1aa; }
+      .switch { position: relative; width: 42px; height: 24px; flex: none; }
+      .switch input { opacity: 0; width: 0; height: 0; }
+      .slider { position: absolute; inset: 0; background: #d4d4d8; border-radius: 999px; transition: .2s; cursor: pointer; }
+      .slider::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 999px; transition: .2s; }
+      input:checked + .slider { background: #4f46e5; }
+      input:checked + .slider::before { transform: translateX(18px); }
+      .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+      .stat { border: 1px solid #e4e4e7; border-radius: 12px; padding: 12px; }
+      .stat .num { font-size: 24px; font-weight: 800; color: #eb7a09; line-height: 1; }
+      .stat .cap { font-size: 11px; color: #71717a; margin-top: 4px; }
+      .sites { margin-top: 14px; font-size: 12px; color: #52525b; }
+      .sites b { color: #18181b; }
+      .foot { margin-top: 14px; font-size: 11px; color: #a1a1aa; line-height: 1.5; }
+      .foot .lock { color: #22c55e; }
+      .foot a { color: #4f46e5; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <div class="head">
+      <img class="badge" src="icons/icon48.png" alt="Sether Shield" width="32" height="32" />
+      <div>
+        <h1>Sether Shield</h1>
+        <div class="sub">PII guard for AI chat</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <div class="label">Protection</div>
+        <div class="state" id="state">On</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="toggle" checked />
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="num" id="scrubbed">0</div><div class="cap">prompts scrubbed</div></div>
+      <div class="stat"><div class="num" id="caught">0</div><div class="cap">PII caught</div></div>
+    </div>
+
+    <div class="sites">Active on <b>ChatGPT</b>, <b>Claude</b> &amp; <b>Gemini</b>.</div>
+
+    <div class="foot">
+      <span class="lock">●</span> 100% local. No data leaves your browser. No telemetry.<br />
+      Part of <a href="https://setherai.vercel.app" target="_blank" rel="noopener">Sether</a> — open-source PII redaction for AI apps.
+    </div>
+
+    <script src="dist/popup.js"></script>
+  </body>
+</html>
