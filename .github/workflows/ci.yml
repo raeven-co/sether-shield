@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: typecheck · test · build · package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install (locked)
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (detector parity)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify build output exists
+        run: test -f dist/content.js && test -f dist/popup.js
+
+      - name: Guard — no network calls in shipped bundles
+        # Sether Shield is "100% local". Fail the build if a fetch/XHR/WebSocket
+        # or remote-host reference ever sneaks into the shipped content script.
+        run: |
+          if grep -nE "fetch\(|XMLHttpRequest|WebSocket|navigator\.sendBeacon|new Image\(" dist/content.js dist/popup.js; then
+            echo "::error::Network-capable call found in shipped bundle — Sether Shield must stay 100% local."
+            exit 1
+          fi
+          echo "OK — no network calls in dist."
+
+      - name: Package extension zip
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          mkdir -p out
+          zip -r "out/sether-shield-v${VERSION}.zip" manifest.json dist icons popup.html
+          echo "Packaged out/sether-shield-v${VERSION}.zip"
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sether-shield-extension
+          path: out/*.zip
+          if-no-files-found: error
+
+  # Manual, secret-gated publish to the Chrome Web Store.
+  # NEVER runs automatically — trigger from the Actions tab ("Run workflow")
+  # only when you intend to ship a reviewed build to your users.
+  # Requires repo secrets: CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN.
+  publish:
+    name: publish to Chrome Web Store (manual)
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: chrome-web-store
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Package
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          zip -r "sether-shield.zip" manifest.json dist icons popup.html
+      - name: Upload & submit (chrome-webstore-upload-cli)
+        env:
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          npx -y chrome-webstore-upload-cli@3 upload \
+            --source sether-shield.zip \
+            --extension-id "$CWS_EXTENSION_ID" \
+            --client-id "$CWS_CLIENT_ID" \
+            --client-secret "$CWS_CLIENT_SECRET" \
+            --refresh-token "$CWS_REFRESH_TOKEN"
+          echo "Uploaded to CWS as a draft. Review and hit Publish in the dashboard (or add --auto-publish when you trust the pipeline)."

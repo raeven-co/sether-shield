@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sether Shield — PII guard for AI chat",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Catches personal data in your prompt before it reaches ChatGPT, Claude, or Gemini. 100% local — nothing leaves your browser.",
   "permissions": ["storage"],
   "icons": {

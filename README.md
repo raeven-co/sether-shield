@@ -17,6 +17,8 @@ This is the **Grammarly pattern**, not a network proxy:
   API keys — OpenAI / AWS / GitHub / Slack / Stripe) as you type.
 - A floating shield shows a live count; one click **scrubs** the PII into
   placeholders (`[email-1]`, `[card-1]`, …) before you send.
+- Changed your mind? **Restore original** puts the real values back in one tap.
+  The originals stay in this tab's memory only, never on disk.
 - A non-blocking nudge appears if you hit send with PII still present.
 
 **What it deliberately does NOT do:**
@@ -26,8 +28,10 @@ This is the **Grammarly pattern**, not a network proxy:
   leaks when the site changes. We operate on the input box instead — robust and honest.
 - It makes **zero network calls** and ships **no telemetry**. The only permission
   is `storage` (for your on/off setting + local stats). All detection is in-page.
-- It does **not** restore tokens in the AI's reply (that round-trip belongs to the
-  library/gateway, where there's a vault). Here you choose what to scrub.
+- It does **not** rewrite the AI's reply. Restoring tokens inside the model's
+  response is the library/gateway's job (that's where the durable vault lives).
+  In the extension you choose what to scrub, and you can **undo a scrub locally**
+  before you send. The undo buffer is in-memory only and cleared on reload.
 
 ## Install (developer / unpacked)
 
@@ -45,13 +49,14 @@ email — the shield turns orange.
 | File | Role |
 | --- | --- |
 | `manifest.json` | MV3 manifest — `storage` permission, content script on the 3 sites |
-| `src/detector.ts` | Vendored, dependency-free PII detectors (ReDoS-safe, Luhn + IBAN mod-97) |
-| `src/content.ts` | Watches the input, shadow-DOM shield UI, scrub + warn |
+| `src/detector.ts` | Detection via the real `@raeven-co/sether/browser` packs (single source of truth) + conversational name/address heuristics; `scrub` / `restore` |
+| `src/content.ts` | Watches the input, shadow-DOM shield UI, scrub + undo + warn |
 | `src/popup.{html,ts}` | On/off toggle + session stats |
 | `build.mjs` | esbuild bundler |
 
 ## Roadmap
 
+- [x] Undo a scrub in the input box (local, ephemeral) — shipped in 0.2.0
 - [ ] Best-effort token **restore** in the reply pane (experimental; opt-in)
 - [ ] "Scrub on send" strict mode (block + confirm) as an option
 - [ ] Brand icons (export from the Sether bird SVG to 16/48/128 PNG)

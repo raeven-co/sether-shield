@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="_shared.css">
+<style>
+  .canvas { width: 1280px; height: 800px; padding: 56px 64px; }
+  .top { display: flex; align-items: flex-start; justify-content: space-between; }
+  .headline { font-size: 46px; max-width: 720px; }
+  .stage { position: relative; margin-top: 38px; }
+  .chat { width: 760px; }
+  .pill { position: absolute; right: 36px; bottom: 30px; }
+  .panel { position: absolute; right: 36px; bottom: 86px; }
+</style></head>
+<body><div class="canvas"><div class="grain"></div>
+  <div class="top">
+    <div>
+      <div class="brandrow"><img src="../icons/icon128.png"><span class="kicker">Sether Shield</span></div>
+      <h1 class="headline" style="margin-top:18px">Catch personal data <span class="accent">before</span> it reaches the AI.</h1>
+      <p class="sub" style="font-size:19px;margin-top:14px">Works on ChatGPT, Claude &amp; Gemini — 100% in your browser.</p>
+    </div>
+  </div>
+  <div class="stage">
+    <div class="chat">
+      <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="title">New chat</span></div>
+      <div class="bubble">Draft a reply to my landlord. My name is <span class="pii">Emori</span>, my email is <span class="pii">emorylebo@gmail.com</span>, and my number is <span class="pii">+234&nbsp;806&nbsp;578&nbsp;6535</span>.</div>
+      <div class="inputrow"><span>Ask anything…</span><span class="send">↑</span></div>
+    </div>
+    <div class="panel">
+      <div class="hd">3 items to scrub</div>
+      <ul>
+        <li><span class="pdot"></span>name<span class="pn">×1</span></li>
+        <li><span class="pdot"></span>email<span class="pn">×1</span></li>
+        <li><span class="pdot"></span>phone<span class="pn">×1</span></li>
+      </ul>
+      <button class="scrub">Scrub this prompt</button>
+      <div class="ft"><span class="lock"></span>100% local — nothing leaves your browser.</div>
+    </div>
+    <div class="pill"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span class="n">3</span></div>
+  </div>
+</div></body></html>

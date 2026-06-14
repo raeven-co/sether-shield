@@ -8,7 +8,7 @@
 // Everything is additive and wrapped so we never break the host site: if a
 // selector misses, the shield simply stays idle.
 
-import { detect, scrub, labelFor, type Match } from './detector.js';
+import { detect, scrub, restore, labelFor, type Match, type VaultEntry } from './detector.js';
 
 interface Stats {
   promptsScrubbed: number;
@@ -28,6 +28,11 @@ const EDITOR_SELECTORS = [
 let enabled = true;
 let matches: Match[] = [];
 let ui: ShieldUI;
+
+// Ephemeral undo buffer for the last scrub. Holds original PII values so the
+// user can revert, so it lives ONLY in this content script's memory — never
+// chrome.storage / disk. Cleared on page reload, navigation, or undo.
+let lastScrub: VaultEntry[] | null = null;
 
 function boot(): void {
   ui = new ShieldUI();
@@ -132,7 +137,18 @@ function doScrub(): void {
   const result = scrub(getText(el));
   if (result.count === 0) return;
   if (setText(el, result.text)) {
+    lastScrub = result.vault; // ephemeral — enables one-tap undo
     bumpStats(result.count);
+    setTimeout(refresh, 50);
+  }
+}
+
+function doUndo(): void {
+  const el = activeEditor();
+  if (!el || !lastScrub) return;
+  const restored = restore(getText(el), lastScrub);
+  if (setText(el, restored)) {
+    lastScrub = null;
     setTimeout(refresh, 50);
   }
 }
@@ -222,17 +238,27 @@ class ShieldUI {
       this.#panel.innerHTML = `<div class="hd">Sether Shield</div><p class="muted">Paused. Turn it back on from the toolbar icon.</p>${FOOTER}`;
       return;
     }
+    // Offer "Restore original" whenever the last scrub is still reversible.
+    const restoreBtn = lastScrub
+      ? `<button class="restore" type="button">↩ Restore original</button>`
+      : '';
     this.#panel.innerHTML = found.length
       ? `<div class="hd">${found.length} item${found.length === 1 ? '' : 's'} to scrub</div>
          <ul class="list">${rows}</ul>
-         <button class="scrub" type="button">Scrub this prompt</button>${FOOTER}`
-      : `<div class="hd">Nothing sensitive detected</div>
-         <p class="muted">Keep typing — I'll flag emails, phone numbers, cards, secrets and more before you send.</p>${FOOTER}`;
-    const btn = this.#panel.querySelector<HTMLButtonElement>('.scrub');
-    btn?.addEventListener('click', () => {
+         <button class="scrub" type="button">Scrub this prompt</button>${restoreBtn}${FOOTER}`
+      : lastScrub
+        ? `<div class="hd">Scrubbed ✓</div>
+           <p class="muted">Your prompt now holds placeholders. Send it safely — or put the originals back, only on this device.</p>
+           ${restoreBtn}${FOOTER}`
+        : `<div class="hd">Nothing sensitive detected</div>
+           <p class="muted">Keep typing — I'll flag emails, phone numbers, cards, secrets and more before you send.</p>${FOOTER}`;
+    this.#panel.querySelector<HTMLButtonElement>('.scrub')?.addEventListener('click', () => {
       doScrub();
-      this.#open = false;
-      this.#panel.classList.remove('show');
+      this.#renderPanel(matches); // keep panel open so Undo is discoverable
+    });
+    this.#panel.querySelector<HTMLButtonElement>('.restore')?.addEventListener('click', () => {
+      doUndo();
+      this.#renderPanel(matches);
     });
   }
 
@@ -268,6 +294,8 @@ const CSS = `
   .list .n { margin-left: auto; font: 600 11px/1 ui-monospace, monospace; color: #a1a1aa; }
   .scrub { width: 100%; height: 34px; border: none; border-radius: 9px; background: #4f46e5; color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; }
   .scrub:hover { background: #4338ca; }
+  .restore { width: 100%; height: 32px; margin-top: 8px; border: 1px solid #e4e4e7; border-radius: 9px; background: #fff; color: #4f46e5; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .restore:hover { background: #f4f4f5; }
   .ft { margin-top: 10px; font-size: 11px; color: #a1a1aa; line-height: 1.4; }
   .ft .lock { color: #22c55e; }
   .ft a { color: #4f46e5; text-decoration: none; }

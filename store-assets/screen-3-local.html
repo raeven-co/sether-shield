@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="_shared.css">
+<style>
+  .canvas { width: 1280px; height: 800px; padding: 56px 64px; display: flex; gap: 56px; align-items: center; }
+  .left { flex: 1; }
+  .headline { font-size: 52px; }
+  .points { margin-top: 32px; display: flex; flex-direction: column; gap: 16px; }
+  .point { display: flex; align-items: center; gap: 14px; font-size: 20px; color: var(--ink); font-weight: 600; }
+  .point .ck { width: 30px; height: 30px; border-radius: 999px; background: rgba(34,197,94,.15); color: #16a34a; display: flex; align-items: center; justify-content: center; font-weight: 800; }
+  /* real popup */
+  .popup { width: 320px; background: #fff; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 36px 80px -28px rgba(24,24,40,.34); padding: 22px; }
+  .phead { display: flex; align-items: center; gap: 11px; }
+  .phead img { width: 40px; height: 40px; border-radius: 11px; }
+  .phead h3 { font-size: 17px; font-weight: 800; color: var(--ink); }
+  .phead .pk { font-size: 12px; color: var(--ink-3); }
+  .prow { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+  .prow .l { font-weight: 700; font-size: 14px; color: var(--ink); }
+  .prow .s { font-size: 11px; color: var(--ink-3); }
+  .sw { width: 46px; height: 26px; border-radius: 999px; background: var(--indigo-deep); position: relative; }
+  .sw::after { content:''; position:absolute; width:20px; height:20px; border-radius:999px; background:#fff; top:3px; right:3px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .stat { border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .stat .num { font-size: 26px; font-weight: 800; color: var(--orange); }
+  .stat .cap { font-size: 11px; color: var(--ink-2); margin-top: 3px; }
+  .pfoot { margin-top: 16px; font-size: 11px; color: var(--ink-3); line-height: 1.5; }
+  .pfoot .lk { color: #22c55e; }
+</style></head>
+<body><div class="canvas"><div class="grain"></div>
+  <div class="left">
+    <div class="brandrow"><img src="../icons/icon128.png"><span class="kicker">Sether Shield</span></div>
+    <h1 class="headline" style="margin-top:20px">100% local.<br>Nothing leaves<br>your browser.</h1>
+    <div class="points">
+      <div class="point"><span class="ck">✓</span>No network calls. No telemetry.</div>
+      <div class="point"><span class="ck">✓</span>No account, no sign-in, no cloud.</div>
+      <div class="point"><span class="ck">✓</span>One permission: local storage.</div>
+      <div class="point"><span class="ck">✓</span>Open source — audit every line.</div>
+    </div>
+  </div>
+  <div class="popup">
+    <div class="phead"><img src="../icons/icon128.png"><div><h3>Sether Shield</h3><div class="pk">PII guard for AI chat</div></div></div>
+    <div class="prow"><div><div class="l">Protection</div><div class="s">On</div></div><div class="sw"></div></div>
+    <div class="stats"><div class="stat"><div class="num">128</div><div class="cap">prompts scrubbed</div></div><div class="stat"><div class="num">439</div><div class="cap">PII caught</div></div></div>
+    <div class="pfoot"><span class="lk">●</span> 100% local. No data leaves your browser. No telemetry.</div>
+  </div>
+</div></body></html>

@@ -15,7 +15,7 @@ const out = await build({
   write: false,
 });
 const mod = await import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
-const { detect, scrub } = mod;
+const { detect, scrub, restore } = mod;
 
 let failed = 0;
 const check = (name, cond) => {
@@ -48,6 +48,15 @@ check('scrub removes the email', !scrubbed.text.includes('amara.okafor@acme.com'
 check('scrub removes the card', !scrubbed.text.includes('4242 4242 4242 4242'));
 check('scrub inserts placeholders', /\[email-1\]/.test(scrubbed.text));
 check('scrub count matches', scrubbed.count === found.length);
+
+// Reversibility (0.2.0): scrub → restore must round-trip exactly.
+check('scrub returns a vault', Array.isArray(scrubbed.vault) && scrubbed.vault.length === scrubbed.count);
+check('restore round-trips to the original', restore(scrubbed.text, scrubbed.vault) === sample);
+check('restore is a no-op without placeholders', restore('plain text', scrubbed.vault) === 'plain text');
+
+// Conversational address (0.2.0).
+check('detects conversational address', detect('I live at 12 Marina Road, Lagos').some((m) => m.type === 'ADDRESS'));
+check('no address false positive without a number', !detect('I live at the office').some((m) => m.type === 'ADDRESS'));
 
 console.log(failed ? `\n❌ ${failed} failed` : '\n✅ all detector checks passed');
 process.exit(failed ? 1 : 0);

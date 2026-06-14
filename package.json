@@ -1,6 +1,6 @@
 {
   "name": "sether-shield",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Sether Shield — a browser extension that catches personal data in your prompt before it reaches ChatGPT, Claude, or Gemini. 100% local.",

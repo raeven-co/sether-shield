@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="_shared.css">
+<style>
+  .canvas { width: 1280px; height: 800px; padding: 56px 64px; }
+  .headline { font-size: 46px; }
+  .sub { font-size: 19px; margin-top: 14px; }
+  .grid { margin-top: 44px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .chip { font-size: 18px; padding: 18px 18px; }
+  .note { margin-top: 36px; font-size: 16px; color: var(--ink-2); }
+  .note b { color: var(--ink); }
+</style></head>
+<body><div class="canvas"><div class="grain"></div>
+  <div class="brandrow"><img src="../icons/icon128.png"><span class="kicker">Sether Shield</span></div>
+  <h1 class="headline" style="margin-top:18px">Emails, secrets, names — <span class="accent">caught locally</span>.</h1>
+  <p class="sub">The same detection engine as the open-source <span style="font-family:ui-monospace,monospace;font-size:16px">@raeven-co/sether</span> package.</p>
+  <div class="grid">
+    <div class="chip"><span class="ck">✓</span>Email</div>
+    <div class="chip"><span class="ck">✓</span>Phone</div>
+    <div class="chip"><span class="ck">✓</span>Credit card</div>
+    <div class="chip"><span class="ck">✓</span>SSN</div>
+    <div class="chip"><span class="ck">✓</span>IBAN</div>
+    <div class="chip"><span class="ck">✓</span>IP address</div>
+    <div class="chip"><span class="ck">✓</span>API keys</div>
+    <div class="chip"><span class="ck">✓</span>Names</div>
+  </div>
+  <p class="note">Cards are <b>Luhn-checked</b>, secrets cover <b>OpenAI · AWS · GitHub · Slack · Stripe</b>, and names are caught from labels and natural phrasing like <b>“my name is …”</b>.</p>
+</div></body></html>

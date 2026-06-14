@@ -1,0 +1,73 @@
+/* Shared brand styling for Sether Shield store assets. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --indigo: #6366f1;
+  --indigo-deep: #4f46e5;
+  --orange: #eb7a09;
+  --ink: #18181b;
+  --ink-2: #52525b;
+  --ink-3: #a1a1aa;
+  --line: #e7e7ea;
+}
+html, body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
+.canvas {
+  position: relative; overflow: hidden;
+  background: radial-gradient(120% 120% at 85% -10%, #eef0ff 0%, #f7f7fb 45%, #ffffff 100%);
+}
+.grain { position: absolute; inset: 0; opacity: .5;
+  background-image: radial-gradient(circle at 1px 1px, rgba(99,102,241,.06) 1px, transparent 0);
+  background-size: 22px 22px; pointer-events: none; }
+
+.brandrow { display: flex; align-items: center; gap: 12px; }
+.brandrow img { width: 40px; height: 40px; border-radius: 10px; display: block; }
+.brandrow .name { font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+.brandrow .kicker { font: 600 12px/1 ui-monospace, monospace; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--indigo-deep); }
+
+.headline { font-weight: 800; letter-spacing: -0.03em; color: var(--ink); line-height: 1.04; }
+.sub { color: var(--ink-2); font-weight: 500; }
+.accent { color: var(--orange); }
+.indigo { color: var(--indigo-deep); }
+
+/* faux chat card */
+.chat { background: #fff; border: 1px solid var(--line); border-radius: 20px;
+  box-shadow: 0 40px 80px -30px rgba(24,24,40,.28); overflow: hidden; }
+.chat .bar { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid #f1f1f4; }
+.dot { width: 11px; height: 11px; border-radius: 999px; }
+.chat .title { margin-left: 10px; font-size: 13px; color: var(--ink-3); font-weight: 600; }
+.bubble { margin: 22px; padding: 16px 18px; background: #f4f4f6; border-radius: 14px;
+  font-size: 17px; line-height: 1.5; color: var(--ink); }
+.pii { background: rgba(235,122,9,.16); border-bottom: 2px solid var(--orange);
+  border-radius: 3px; padding: 0 2px; font-weight: 600; }
+.tok { background: rgba(99,102,241,.14); color: var(--indigo-deep); border-radius: 5px;
+  padding: 1px 6px; font: 600 15px/1.4 ui-monospace, monospace; }
+.inputrow { display: flex; align-items: center; justify-content: space-between;
+  margin: 0 22px 22px; padding: 14px 16px; border: 1.5px solid #e4e4e8; border-radius: 14px; color: var(--ink-3); font-size: 15px; }
+.send { width: 34px; height: 34px; border-radius: 9px; background: var(--ink); color: #fff;
+  display: flex; align-items: center; justify-content: center; }
+
+/* the real shield pill */
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px;
+  border-radius: 999px; background: var(--orange); color: #fff; font-weight: 700; font-size: 15px;
+  box-shadow: 0 10px 26px -8px rgba(235,122,9,.6); }
+.pill .n { font: 700 13px/1 ui-monospace, monospace; background: rgba(255,255,255,.24); padding: 3px 8px; border-radius: 999px; }
+
+/* the real panel */
+.panel { width: 290px; background: #fff; border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: 0 24px 60px -18px rgba(24,24,40,.34); padding: 16px; }
+.panel .hd { font-weight: 800; font-size: 16px; color: var(--ink); margin-bottom: 12px; }
+.panel ul { list-style: none; }
+.panel li { display: flex; align-items: center; gap: 10px; font-size: 15px; padding: 7px 0;
+  border-bottom: 1px solid #f4f4f5; color: var(--ink); }
+.panel li .pdot { width: 8px; height: 8px; border-radius: 999px; background: var(--orange); }
+.panel li .pn { margin-left: auto; font: 700 12px/1 ui-monospace, monospace; color: var(--ink-3); }
+.scrub { width: 100%; height: 40px; border: none; border-radius: 10px; background: var(--indigo-deep);
+  color: #fff; font-weight: 700; font-size: 15px; margin-top: 12px; }
+.ft { margin-top: 12px; font-size: 12px; color: var(--ink-3); display: flex; align-items: center; gap: 6px; }
+.ft .lock { width: 8px; height: 8px; border-radius: 999px; background: #22c55e; }
+
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px;
+  background: #fff; border: 1px solid var(--line); font-weight: 600; color: var(--ink); font-size: 16px;
+  box-shadow: 0 8px 20px -14px rgba(24,24,40,.25); }
+.chip .ck { width: 20px; height: 20px; border-radius: 999px; background: rgba(34,197,94,.15);
+  color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; }
