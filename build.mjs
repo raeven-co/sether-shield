@@ -12,6 +12,7 @@ const common = {
 const entries = [
   { entryPoints: ['src/content.ts'], outfile: 'dist/content.js' },
   { entryPoints: ['src/popup.ts'], outfile: 'dist/popup.js' },
+  { entryPoints: ['src/background.ts'], outfile: 'dist/background.js' },
 ];
 
 const watch = process.argv.includes('--watch');

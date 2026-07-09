@@ -1,0 +1,83 @@
+{
+  "extName": {
+    "message": "Sether Shield — Proteção de dados para IA"
+  },
+  "extDescription": {
+    "message": "Detecta dados pessoais nos seus prompts antes de chegarem ao ChatGPT, Claude ou Gemini. 100% local — nada sai do seu navegador."
+  },
+  "commandTriggerScan": {
+    "message": "Acionar análise PII na página atual"
+  },
+  "protectionLabel": {
+    "message": "Proteção"
+  },
+  "statusOn": {
+    "message": "Ativado"
+  },
+  "statusPaused": {
+    "message": "Pausado"
+  },
+  "thisSite": {
+    "message": "Este site"
+  },
+  "enabled": {
+    "message": "Ativado"
+  },
+  "disabled": {
+    "message": "Desativado"
+  },
+  "promptsScrubbed": {
+    "message": "prompts limpos"
+  },
+  "piiCaught": {
+    "message": "dados detectados"
+  },
+  "redactionHistory": {
+    "message": "Histórico de redações"
+  },
+  "clearAll": {
+    "message": "Limpar tudo"
+  },
+  "noHistory": {
+    "message": "Nenhuma redação registrada."
+  },
+  "nothingDetected": {
+    "message": "Nada sensível detectado"
+  },
+  "keepTyping": {
+    "message": "Continue digitando — sinalizarei e-mails, telefones, cartões e mais antes de enviar."
+  },
+  "scrubPrompt": {
+    "message": "Limpar tudo"
+  },
+  "pausedMessage": {
+    "message": "Pausado. Reative pelo ícone na barra de ferramentas."
+  },
+  "accept": {
+    "message": "Aceitar"
+  },
+  "reject": {
+    "message": "Rejeitar"
+  },
+  "dismiss": {
+    "message": "Ignorar"
+  },
+  "headsUp": {
+    "message": "Atenção — seu prompt ainda tem $COUNT$ item(ns) sensível(is).",
+    "placeholders": {
+      "COUNT": { "content": "$1" }
+    }
+  },
+  "localPrivacy": {
+    "message": "100% local — nada sai do seu navegador."
+  },
+  "shortcutHint": {
+    "message": "Atalho: Alt+Shift+S"
+  },
+  "footerPrivacy": {
+    "message": "100% local. Nenhum dado sai do seu navegador."
+  },
+  "footerPartOf": {
+    "message": "Parte de"
+  }
+}

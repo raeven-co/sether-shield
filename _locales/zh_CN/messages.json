@@ -1,0 +1,83 @@
+{
+  "extName": {
+    "message": "Sether Shield — AI 聊天隐私保护"
+  },
+  "extDescription": {
+    "message": "在个人数据发送到 ChatGPT、Claude 或 Gemini 之前检测并保护。100% 本地运行 — 没有任何数据离开您的浏览器。"
+  },
+  "commandTriggerScan": {
+    "message": "在当前页面触发隐私数据扫描"
+  },
+  "protectionLabel": {
+    "message": "保护"
+  },
+  "statusOn": {
+    "message": "已开启"
+  },
+  "statusPaused": {
+    "message": "已暂停"
+  },
+  "thisSite": {
+    "message": "此网站"
+  },
+  "enabled": {
+    "message": "已启用"
+  },
+  "disabled": {
+    "message": "已禁用"
+  },
+  "promptsScrubbed": {
+    "message": "提示已清理"
+  },
+  "piiCaught": {
+    "message": "数据已检测"
+  },
+  "redactionHistory": {
+    "message": "脱敏历史"
+  },
+  "clearAll": {
+    "message": "全部清除"
+  },
+  "noHistory": {
+    "message": "尚无脱敏记录。"
+  },
+  "nothingDetected": {
+    "message": "未检测到敏感信息"
+  },
+  "keepTyping": {
+    "message": "继续输入 — 我会在发送前标记邮箱、电话、银行卡等敏感信息。"
+  },
+  "scrubPrompt": {
+    "message": "全部清理"
+  },
+  "pausedMessage": {
+    "message": "已暂停。请通过工具栏图标重新启用。"
+  },
+  "accept": {
+    "message": "接受"
+  },
+  "reject": {
+    "message": "拒绝"
+  },
+  "dismiss": {
+    "message": "忽略"
+  },
+  "headsUp": {
+    "message": "注意 — 您的提示中仍有 $COUNT$ 个敏感项。",
+    "placeholders": {
+      "COUNT": { "content": "$1" }
+    }
+  },
+  "localPrivacy": {
+    "message": "100% 本地运行 — 没有任何数据离开您的浏览器。"
+  },
+  "shortcutHint": {
+    "message": "快捷键: Alt+Shift+S"
+  },
+  "footerPrivacy": {
+    "message": "100% 本地运行。没有数据离开您的浏览器。"
+  },
+  "footerPartOf": {
+    "message": "属于"
+  }
+}

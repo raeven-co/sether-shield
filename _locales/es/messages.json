@@ -1,0 +1,83 @@
+{
+  "extName": {
+    "message": "Sether Shield — Protección de datos para IA"
+  },
+  "extDescription": {
+    "message": "Detecta datos personales en tus prompts antes de que lleguen a ChatGPT, Claude o Gemini. 100% local — nada sale de tu navegador."
+  },
+  "commandTriggerScan": {
+    "message": "Activar análisis PII en la página actual"
+  },
+  "protectionLabel": {
+    "message": "Protección"
+  },
+  "statusOn": {
+    "message": "Activado"
+  },
+  "statusPaused": {
+    "message": "En pausa"
+  },
+  "thisSite": {
+    "message": "Este sitio"
+  },
+  "enabled": {
+    "message": "Activado"
+  },
+  "disabled": {
+    "message": "Desactivado"
+  },
+  "promptsScrubbed": {
+    "message": "prompts limpiados"
+  },
+  "piiCaught": {
+    "message": "datos detectados"
+  },
+  "redactionHistory": {
+    "message": "Historial de redacciones"
+  },
+  "clearAll": {
+    "message": "Borrar todo"
+  },
+  "noHistory": {
+    "message": "No hay redacciones registradas."
+  },
+  "nothingDetected": {
+    "message": "No se detectó nada sensible"
+  },
+  "keepTyping": {
+    "message": "Sigue escribiendo — señalaré correos, teléfonos, tarjetas y más antes de enviar."
+  },
+  "scrubPrompt": {
+    "message": "Limpiar todo"
+  },
+  "pausedMessage": {
+    "message": "En pausa. Reactívalo desde el icono de la barra de herramientas."
+  },
+  "accept": {
+    "message": "Aceptar"
+  },
+  "reject": {
+    "message": "Rechazar"
+  },
+  "dismiss": {
+    "message": "Ignorar"
+  },
+  "headsUp": {
+    "message": "Atención — tu prompt aún tiene $COUNT$ elemento(s) sensible(s).",
+    "placeholders": {
+      "COUNT": { "content": "$1" }
+    }
+  },
+  "localPrivacy": {
+    "message": "100% local — nada sale de tu navegador."
+  },
+  "shortcutHint": {
+    "message": "Atajo: Alt+Mayús+S"
+  },
+  "footerPrivacy": {
+    "message": "100% local. Ningún dato sale de tu navegador."
+  },
+  "footerPartOf": {
+    "message": "Parte de"
+  }
+}
