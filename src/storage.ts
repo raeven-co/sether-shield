@@ -12,12 +12,10 @@
 // │ settings         │ { enabled: boolean, autoRedact?: boolean,           │
 // │                  │   language?: string }                               │
 // │ stats            │ { promptsScrubbed: number, piiCaught: number }      │
-// │ siteSettings     │ { disabledSites: string[] }                         │
+// │ siteSettings     │ { allowedSites: string[] }                          │
 // │ redactionHistory │ RedactionRecord[] (max 500, FIFO eviction)          │
 // │ customRules      │ CustomRule[] (user-defined regex rules, incl.       │
 // │                  │ pre-seeded built-ins)                               │
-// │ exposureLog      │ ExposureEvent[] (for Shield Score; no PII content)  │
-// │ scoreSnapshots   │ ScoreSnapshot[] (weekly score history, max 52)      │
 // └──────────────────┴─────────────────────────────────────────────────────┘
 //
 // CRITICAL: redactionHistory stores ONLY masked values (e.g. "j***@***.com"),
@@ -70,16 +68,41 @@ export async function bumpStats(piiCaught: number): Promise<void> {
   });
 }
 
-// ── Per-site allowlist (opt-out model) ────────────────────────────────────────
+// ── Per-site allowlist (opt-IN model) ─────────────────────────────────────────
 //
-// Design decision: OPT-OUT model.
-// All sites matched by manifest content_scripts are enabled by default.
-// Users explicitly disable sites they don't want the extension on.
+// Design decision: OPT-IN model.
+// The shield activates ONLY on origins explicitly listed in allowedSites.
+// Default list contains major AI chat platforms.
+
+const DEFAULT_ALLOWED_SITES = [
+  'https://chatgpt.com',
+  'https://chat.openai.com',
+  'https://claude.ai',
+  'https://gemini.google.com',
+  'https://chat.deepseek.com',
+  'https://www.perplexity.ai',
+  'https://copilot.microsoft.com',
+  'https://poe.com',
+  'https://character.ai',
+  'https://huggingface.co',
+  'https://chat.mistral.ai',
+  'https://grok.x.ai',
+];
+
+export const DEFAULT_ALLOWED_SITES_LIST = DEFAULT_ALLOWED_SITES;
 
 export async function getSiteSettings(): Promise<SiteSettings> {
   return new Promise((resolve) => {
     chrome.storage.local.get('siteSettings', (v) => {
-      resolve(v?.siteSettings ?? { disabledSites: [] });
+      const stored = v?.siteSettings as SiteSettings | undefined;
+      // If allowedSites exists, use it directly
+      if (stored?.allowedSites) {
+        resolve(stored);
+        return;
+      }
+      // First run or legacy — seed defaults
+      const defaults: SiteSettings = { allowedSites: [...DEFAULT_ALLOWED_SITES] };
+      chrome.storage.local.set({ siteSettings: defaults }, () => resolve(defaults));
     });
   });
 }
@@ -92,19 +115,27 @@ export async function setSiteSettings(siteSettings: SiteSettings): Promise<void>
 
 export async function isSiteEnabled(origin: string): Promise<boolean> {
   const settings = await getSiteSettings();
-  return !settings.disabledSites.includes(origin);
+  return settings.allowedSites.includes(origin);
 }
 
-export async function toggleSite(origin: string): Promise<boolean> {
+export async function addAllowedSite(origin: string): Promise<boolean> {
   const settings = await getSiteSettings();
-  const idx = settings.disabledSites.indexOf(origin);
-  if (idx >= 0) {
-    settings.disabledSites.splice(idx, 1);
-  } else {
-    settings.disabledSites.push(origin);
+  if (settings.allowedSites.includes(origin)) {
+    return false; // already exists
   }
+  settings.allowedSites.push(origin);
   await setSiteSettings(settings);
-  return !settings.disabledSites.includes(origin);
+  return true; // newly added
+}
+
+export async function removeAllowedSite(origin: string): Promise<void> {
+  const settings = await getSiteSettings();
+  settings.allowedSites = settings.allowedSites.filter((s) => s !== origin);
+  await setSiteSettings(settings);
+}
+
+export async function resetAllowedSites(): Promise<void> {
+  await setSiteSettings({ allowedSites: [...DEFAULT_ALLOWED_SITES] });
 }
 
 // ── Redaction history ─────────────────────────────────────────────────────────
@@ -188,7 +219,7 @@ const BUILTIN_RULES: CustomRule[] = [
   },
   {
     id: 'builtin-drivers-license',
-    name: 'Driver\'s License / Permit ID',
+    name: "Driver's License / Permit ID",
     pattern: '\\b[A-Za-z]\\d{4}-\\d{5}-\\d{5}\\b|\\b[A-Za-z0-9]{6,12}\\b',
     flags: 'gi',
     replacement: '[LICENSE-ID]',

@@ -92,6 +92,14 @@ let currentMatches: Match[] = [];
 /** Session-scoped dismissed suggestions. Key = `type:value`. */
 const dismissedKeys = new Set<string>();
 
+function addDismissedKey(key: string): void {
+  dismissedKeys.add(key);
+  if (dismissedKeys.size > 500) {
+    const oldest = dismissedKeys.values().next().value;
+    if (oldest !== undefined) dismissedKeys.delete(oldest);
+  }
+}
+
 /**
  * F1: Paste tracking.
  * Stores the text content of the most recent paste event per element.
@@ -107,11 +115,27 @@ const pasteFragments = new WeakMap<HTMLElement, Set<string>>();
  */
 const pastedPIIValues = new Set<string>();
 
+function addPastedPIIValue(val: string): void {
+  pastedPIIValues.add(val);
+  if (pastedPIIValues.size > 1000) {
+    const oldest = pastedPIIValues.values().next().value;
+    if (oldest !== undefined) pastedPIIValues.delete(oldest);
+  }
+}
+
 /**
  * F3: Session-scoped dismissed response guard alerts.
  * Key = `type:value`. Reset on page reload.
  */
 const responseGuardDismissed = new Set<string>();
+
+function addResponseGuardDismissed(key: string): void {
+  responseGuardDismissed.add(key);
+  if (responseGuardDismissed.size > 500) {
+    const oldest = responseGuardDismissed.values().next().value;
+    if (oldest !== undefined) responseGuardDismissed.delete(oldest);
+  }
+}
 
 // UI instances
 let shieldUI: ShieldUI;
@@ -286,7 +310,11 @@ function replaceMatchInElement(el: HTMLElement, match: Match, replacement: strin
       sel.addRange(range);
     }
 
-    const ok = document.execCommand('insertHTML', false, `<u>${escapeHtml(replacement)}</u>`);
+    const tempDiv = document.createElement('div');
+    const uEl = document.createElement('u');
+    uEl.textContent = replacement;
+    tempDiv.appendChild(uEl);
+    const ok = document.execCommand('insertHTML', false, tempDiv.innerHTML);
     if (!ok) {
       document.execCommand('insertText', false, replacement);
     }
@@ -386,7 +414,7 @@ function onPaste(e: ClipboardEvent): void {
   const pastedMatches = detect(text);
   for (const m of pastedMatches) {
     // F3: Track pasted PII values for response guard
-    pastedPIIValues.add(m.value);
+    addPastedPIIValue(m.value);
   }
 
 
@@ -547,7 +575,7 @@ function doScrub(): void {
     if (replaceMatchInElement(el, m, replacement)) {
       const source: 'paste' | 'typed' = isPastedMatch(el, m) ? 'paste' : 'typed';
       addRedactionRecord({
-        pageUrl: location.origin + location.pathname,
+        pageUrl: location.origin,
         category: labelFor(m.type),
         redactedValue: replacement,
         timestamp: Date.now(),
@@ -668,7 +696,8 @@ class ShieldUI {
       chrome.storage?.local.get('shieldPosition', (r) => {
         const pos = r?.shieldPosition;
         if (pos && typeof pos.top === 'number') {
-          this.#host.style.top = `${pos.top}px`;
+          const clampedTop = Math.max(8, Math.min(pos.top, window.innerHeight - 60));
+          this.#host.style.top = `${clampedTop}px`;
           this.#host.style.bottom = 'auto';
           
           if (pos.side === 'left') {
@@ -1004,7 +1033,7 @@ class ShieldUI {
         const idx = parseInt(btn.getAttribute('data-idx') || '0', 10);
         const m = echoed[idx];
         if (!m) return;
-        responseGuardDismissed.add(matchKey(m));
+        addResponseGuardDismissed(matchKey(m));
         refresh();
       });
     });
@@ -1016,7 +1045,7 @@ class ShieldUI {
         const kind = btn.getAttribute('data-kind');
         const m = kind === 'echo' ? echoed[idx] : detected[idx];
         if (!m) return;
-        responseGuardDismissed.add(matchKey(m));
+        addResponseGuardDismissed(matchKey(m));
         refresh();
       });
     });
@@ -1028,7 +1057,7 @@ class ShieldUI {
 
     if (replaceMatchInElement(this.#activeEl, m, replacement)) {
       addRedactionRecord({
-        pageUrl: location.origin + location.pathname,
+        pageUrl: location.origin,
         category: labelFor(m.type),
         redactedValue: replacement,
         timestamp: Date.now(),
@@ -1040,14 +1069,29 @@ class ShieldUI {
   }
 
   #dismiss(m: Match): void {
-    dismissedKeys.add(matchKey(m));
+    addDismissedKey(matchKey(m));
     refresh();
   }
 
   toast(n: number): void {
+    if ((this.#toastEl as any).timeoutId) clearTimeout((this.#toastEl as any).timeoutId);
+    if ((this.#toastEl as any).displayTimeoutId) clearTimeout((this.#toastEl as any).displayTimeoutId);
+    
     this.#toastEl.textContent = msg('headsUp', String(n));
-    this.#toastEl.classList.add('show');
-    setTimeout(() => this.#toastEl.classList.remove('show'), 3200);
+    this.#toastEl.style.display = 'block';
+    
+    (this.#toastEl as any).timeoutId = setTimeout(() => {
+      this.#toastEl.classList.add('show');
+    }, 10);
+    
+    (this.#toastEl as any).timeoutId = setTimeout(() => {
+      this.#toastEl.classList.remove('show');
+      (this.#toastEl as any).displayTimeoutId = setTimeout(() => {
+        if (!this.#toastEl.classList.contains('show')) {
+          this.#toastEl.style.display = 'none';
+        }
+      }, 200);
+    }, 3200);
   }
 }
 
@@ -1196,6 +1240,18 @@ async function boot(): Promise<void> {
           // Rules changed from popup — reload into detector
           getCustomRules().then((rules) => applyCustomRules(rules));
           sendResponse({ ok: true });
+        } else if (message.action === 'reloadSites') {
+          // Allowed sites changed — re-check this page
+          isSiteEnabled(location.origin).then((enabled) => {
+            siteEnabled = enabled;
+            if (!enabled) {
+              shieldUI.hide();
+            } else {
+              shieldUI.show();
+              refresh();
+            }
+          });
+          sendResponse({ ok: true });
         }
         return true;
       });
@@ -1297,8 +1353,8 @@ const SHIELD_CSS = `
   .ft .lock { color: #10b981; }
   .ft a { color: #ea580c; text-decoration: none; font-weight: 600; }
   .ft a:hover { text-decoration: underline; }
-  .toast { position: absolute; right: 0; bottom: 46px; max-width: 280px; background: #111827; color: #fff; font-size: 13px; line-height: 1.4; padding: 10px 12px; border-radius: 10px; box-shadow: 0 12px 30px -10px rgba(0,0,0,.4); opacity: 0; transform: translateY(6px); pointer-events: none; transition: opacity .2s, transform .2s; }
-  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast { position: absolute; right: 0; bottom: 46px; max-width: 280px; background: #111827; color: #fff; font-size: 13px; line-height: 1.4; padding: 10px 12px; border-radius: 10px; box-shadow: 0 12px 30px -10px rgba(0,0,0,.4); opacity: 0; transform: translateY(6px); pointer-events: none; transition: opacity .2s, transform .2s; display: none; }
+  .toast.show { display: block; opacity: 1; transform: translateY(0); }
   @keyframes pulse {
     0%, 100% { box-shadow: 0 6px 20px -6px rgba(239,68,68,.5); }
     50% { box-shadow: 0 6px 28px -4px rgba(239,68,68,.7); }

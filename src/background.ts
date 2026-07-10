@@ -24,6 +24,8 @@ chrome.commands.onCommand.addListener(async (command: string) => {
 
 // Relay badge updates from content scripts → toolbar icon
 chrome.runtime.onMessage.addListener((message, sender) => {
+  // Only accept messages from our own content scripts (not external pages)
+  if (sender.id !== chrome.runtime.id) return;
   if (message.action === 'updateBadge' && sender.tab?.id) {
     const count = message.count as number;
 

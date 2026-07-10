@@ -15,9 +15,15 @@ import {
   updateCustomRule,
   deleteCustomRule,
   resetBuiltinRules,
+  getSiteSettings,
+  addAllowedSite,
+  removeAllowedSite,
+  resetAllowedSites,
+  DEFAULT_ALLOWED_SITES_LIST,
 } from './storage.js';
 
 import type { CustomRule } from './types.js';
+import { isRegexSafe } from './detector.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -75,6 +81,14 @@ const rulesList = $('rulesList');
 const rulesEmpty = $('rulesEmpty');
 const addRuleBtn = $('addRuleBtn');
 const resetRulesBtn = $('resetRulesBtn');
+
+// Sites
+const sitesList = $('sitesList');
+const sitesEmpty = $('sitesEmpty');
+const siteUrlIn = $<HTMLInputElement>('siteUrlIn');
+const addSiteBtn = $('addSiteBtn');
+const addCurrentSiteBtn = $('addCurrentSiteBtn');
+const resetSitesBtn = $('resetSitesBtn');
 
 // Add Rule Overlay
 const addRuleOverlay = $('addRuleOverlay');
@@ -175,29 +189,53 @@ async function renderHistory(): Promise<void> {
     const item = document.createElement('div');
     item.className = 'h-item';
 
-    let catHTML = `<span class="h-dot"></span><span style="text-transform:capitalize">${r.category}</span>`;
-    if (r.source === 'paste') catHTML += `<span class="h-badge">📋</span>`;
+    const info = document.createElement('div');
+    info.className = 'h-info';
 
-    item.innerHTML = `
-      <div class="h-info">
-        <div class="h-cat">${catHTML}<span class="h-val">${escapeHtml(r.redactedValue)}</span></div>
-        <div class="h-meta">${safeHostname(r.pageUrl)} — ${timeAgo(r.timestamp)}</div>
-      </div>`;
+    const cat = document.createElement('div');
+    cat.className = 'h-cat';
+
+    const dot = document.createElement('span');
+    dot.className = 'h-dot';
+    cat.appendChild(dot);
+
+    const catText = document.createElement('span');
+    catText.style.textTransform = 'capitalize';
+    catText.textContent = r.category;
+    cat.appendChild(catText);
+
+    if (r.source === 'paste') {
+      const badge = document.createElement('span');
+      badge.className = 'h-badge';
+      badge.textContent = '📋';
+      cat.appendChild(badge);
+    }
+
+    const val = document.createElement('span');
+    val.className = 'h-val';
+    val.textContent = r.redactedValue;
+    cat.appendChild(val);
+
+    const meta = document.createElement('div');
+    meta.className = 'h-meta';
+    meta.textContent = `${safeHostname(r.pageUrl)} — ${timeAgo(r.timestamp)}`;
+
+    info.appendChild(cat);
+    info.appendChild(meta);
+    item.appendChild(info);
 
     const del = document.createElement('button');
     del.className = 'h-del';
     del.textContent = '×';
-    del.addEventListener('click', async () => { await deleteRedactionRecord(r.id); await renderHistory(); });
+    del.addEventListener('click', async () => {
+      await deleteRedactionRecord(r.id);
+      await renderHistory();
+    });
     item.appendChild(del);
     historyList.appendChild(item);
   }
 }
 
-function escapeHtml(s: string): string {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
 
 function safeHostname(url: string): string {
   try { return new URL(url).hostname; } catch { return ''; }
@@ -263,7 +301,6 @@ async function renderRules(): Promise<void> {
 
     const sw = document.createElement('label');
     sw.className = 'switch';
-    sw.style.cssText = 'width:34px;height:18px;';
     const inp = document.createElement('input');
     inp.type = 'checkbox';
     inp.checked = rule.enabled;
@@ -281,7 +318,7 @@ async function renderRules(): Promise<void> {
     // Edit button
     const editBtn = document.createElement('button');
     editBtn.className = 'rule-edit';
-    editBtn.textContent = '✏️';
+    editBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`;
     editBtn.title = 'Edit rule';
     editBtn.addEventListener('click', () => {
       openEditRule(rule);
@@ -307,10 +344,10 @@ async function renderRules(): Promise<void> {
   }
 }
 
-function notifyContentScript(): void {
+function notifyContentScript(action: 'reloadRules' | 'reloadSites' = 'reloadRules'): void {
   try {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { action: 'reloadRules' }).catch(() => {});
+      if (tabs[0]?.id) chrome.tabs.sendMessage(tabs[0].id, { action }).catch(() => {});
     });
   } catch {}
 }
@@ -452,8 +489,21 @@ ruleReplacementIn.addEventListener('input', updateSaveState);
 customPatternIn.addEventListener('input', () => {
   const p = customPatternIn.value.trim();
   if (p) {
-    try { new RegExp(p, 'gi'); patternErr.classList.remove('show'); customPatternIn.classList.remove('err'); }
-    catch { patternErr.classList.add('show'); customPatternIn.classList.add('err'); }
+    try {
+      new RegExp(p, 'gi');
+      if (isRegexSafe(p, 'gi')) {
+        patternErr.classList.remove('show');
+        customPatternIn.classList.remove('err');
+      } else {
+        patternErr.textContent = 'Regex is too complex (potential ReDoS risk)';
+        patternErr.classList.add('show');
+        customPatternIn.classList.add('err');
+      }
+    } catch {
+      patternErr.textContent = 'Invalid regex pattern';
+      patternErr.classList.add('show');
+      customPatternIn.classList.add('err');
+    }
   } else {
     patternErr.classList.remove('show');
     customPatternIn.classList.remove('err');
@@ -471,7 +521,14 @@ function updateSaveState(): void {
   if (selectedType === 'custom') {
     const p = customPatternIn.value.trim();
     hasInput = p.length > 0;
-    try { new RegExp(p, 'gi'); } catch { hasInput = false; }
+    try {
+      new RegExp(p, 'gi');
+      if (!isRegexSafe(p, 'gi')) {
+        hasInput = false;
+      }
+    } catch {
+      hasInput = false;
+    }
   }
   saveRuleBtn.disabled = !(hasName && hasType && hasInput && hasReplacement);
 }
@@ -535,7 +592,7 @@ async function init(): Promise<void> {
   applyAutoRedact(!!settings.autoRedact);
 
   // Parallel renders
-  await Promise.all([renderRules(), renderHistory()]);
+  await Promise.all([renderRules(), renderHistory(), renderSites()]);
 }
 
 // ── Event Listeners ───────────────────────────────────────────────────────────
@@ -573,6 +630,153 @@ resetRulesBtn.addEventListener('click', async () => {
     await resetBuiltinRules();
     notifyContentScript();
     await renderRules();
+  }
+});
+
+// ── Sites Tab ──────────────────────────────────────────────────────────────────
+
+function showSiteMsg(text: string, type: 'success' | 'error' | 'info' = 'info'): void {
+  let msgEl = document.getElementById('siteFeedbackMsg');
+  if (!msgEl) {
+    msgEl = document.createElement('div');
+    msgEl.id = 'siteFeedbackMsg';
+    const panel = document.getElementById('panelSites');
+    const scrollList = panel?.querySelector('.scroll-list');
+    if (scrollList && panel) panel.insertBefore(msgEl, scrollList);
+  }
+  
+  const colors: Record<string, string> = {
+    success: 'background:#d1fae5;color:#065f46;',
+    error: 'background:#fee2e2;color:#991b1b;',
+    info: 'background:#e0e7ff;color:#3730a3;',
+  };
+  
+  // Set initial styles
+  msgEl.style.cssText = 'font-size:10px;font-weight:600;padding:6px 10px;border-radius:8px;margin-bottom:8px;transition:opacity .3s, margin .3s, padding .3s, height .3s; display:block; opacity:0; ' + colors[type];
+  msgEl.textContent = text;
+  
+  // Clear any existing timeouts on the element
+  if ((msgEl as any).timeoutId) clearTimeout((msgEl as any).timeoutId);
+  if ((msgEl as any).displayTimeoutId) clearTimeout((msgEl as any).displayTimeoutId);
+  
+  // Force a reflow before setting opacity
+  msgEl.getBoundingClientRect();
+  msgEl.style.opacity = '1';
+  
+  (msgEl as any).timeoutId = setTimeout(() => {
+    if (msgEl) {
+      msgEl.style.opacity = '0';
+      (msgEl as any).displayTimeoutId = setTimeout(() => {
+        if (msgEl && msgEl.style.opacity === '0') {
+          msgEl.style.display = 'none';
+        }
+      }, 300);
+    }
+  }, 2500);
+}
+
+async function renderSites(): Promise<void> {
+  const { allowedSites } = await getSiteSettings();
+  sitesList.innerHTML = '';
+
+  if (allowedSites.length === 0) {
+    sitesEmpty.style.display = 'block';
+    sitesList.appendChild(sitesEmpty);
+    return;
+  }
+  sitesEmpty.style.display = 'none';
+
+  for (const origin of allowedSites) {
+    const isDefault = DEFAULT_ALLOWED_SITES_LIST.includes(origin);
+
+    const item = document.createElement('div');
+    item.className = 'site-item';
+
+    const originEl = document.createElement('span');
+    originEl.className = 'site-origin';
+    originEl.textContent = origin.replace(/^https?:\/\//, '');
+    originEl.title = origin;
+    item.appendChild(originEl);
+
+    if (isDefault) {
+      const badge = document.createElement('span');
+      badge.className = 'site-default-badge';
+      badge.textContent = 'built-in';
+      item.appendChild(badge);
+    }
+
+    const del = document.createElement('button');
+    del.className = 'site-del';
+    del.title = 'Remove site';
+    del.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+    del.addEventListener('click', async () => {
+      await removeAllowedSite(origin);
+      notifyContentScript('reloadSites');
+      await renderSites();
+    });
+    item.appendChild(del);
+
+    sitesList.appendChild(item);
+  }
+}
+
+function normalizeOrigin(raw: string): string | null {
+  try {
+    const url = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+    return url.origin; // e.g. "https://example.com"
+  } catch {
+    return null;
+  }
+}
+
+addSiteBtn.addEventListener('click', async () => {
+  const raw = siteUrlIn.value.trim();
+  if (!raw) return;
+  const origin = normalizeOrigin(raw);
+  if (!origin) { siteUrlIn.classList.add('err'); return; }
+  siteUrlIn.classList.remove('err');
+  siteUrlIn.value = '';
+  const added = await addAllowedSite(origin);
+  notifyContentScript('reloadSites');
+  await renderSites();
+  showSiteMsg(added ? `✓ ${origin.replace(/^https?:\/\//, '')} added!` : `Already in your list`, added ? 'success' : 'info');
+});
+
+siteUrlIn.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') addSiteBtn.click();
+  else siteUrlIn.classList.remove('err');
+});
+
+addCurrentSiteBtn.addEventListener('click', async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = tab?.url;
+    if (!url) {
+      showSiteMsg('Could not get the current page URL.', 'error');
+      return;
+    }
+    const origin = new URL(url).origin;
+    if (origin === 'null' || origin.startsWith('chrome')) {
+      showSiteMsg('This page cannot be added (browser internal page).', 'error');
+      return;
+    }
+    const added = await addAllowedSite(origin);
+    notifyContentScript('reloadSites');
+    await renderSites();
+    showSiteMsg(
+      added ? `✓ ${origin.replace(/^https?:\/\//, '')} added!` : `Already in your list`,
+      added ? 'success' : 'info'
+    );
+  } catch {
+    showSiteMsg('Could not read the current tab.', 'error');
+  }
+});
+
+resetSitesBtn.addEventListener('click', async () => {
+  if (confirm('Reset protected sites back to the built-in AI platform defaults?')) {
+    await resetAllowedSites();
+    notifyContentScript('reloadSites');
+    await renderSites();
   }
 });
 

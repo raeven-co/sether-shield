@@ -29,10 +29,14 @@ export interface RedactionRecord {
   source?: 'paste' | 'typed';
 }
 
-/** Per-site settings — opt-out model: all matched sites are enabled by default.
- *  Only sites the user explicitly disables appear in this list. */
+/** Per-site settings — opt-IN allowlist model.
+ *  The shield only runs on sites explicitly listed in allowedSites.
+ *  Ships with defaults pre-seeded for major AI chat platforms. */
 export interface SiteSettings {
-  disabledSites: string[];
+  /** Legacy opt-out list — kept for backward compat migration only. */
+  disabledSites?: string[];
+  /** Allowlist of origins (e.g. "https://chatgpt.com") where shield is active. */
+  allowedSites: string[];
 }
 
 /** Global on/off settings. */

@@ -122,13 +122,37 @@ export interface CustomRule {
   builtIn: boolean;
 }
 
+export function isRegexSafe(pattern: string, flags: string): boolean {
+  try {
+    const re = new RegExp(pattern, flags.includes('g') ? flags : flags + 'g');
+    const testStrings = [
+      "a".repeat(100),
+      "a".repeat(25) + "!",
+      " ".repeat(50),
+      "1".repeat(50),
+      "a1".repeat(25)
+    ];
+    for (const str of testStrings) {
+      const start = performance.now();
+      Array.from(str.matchAll(re));
+      const dur = performance.now() - start;
+      if (dur > 20) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Runtime-mutable list of active custom detectors. Updated by loadCustomRules(). */
 let customDetectors: Detector[] = [];
 
 /** Call this after loading CustomRule[] from storage to update the live detector set. */
 export function applyCustomRules(rules: CustomRule[]): void {
   customDetectors = rules
-    .filter((r) => r.enabled)
+    .filter((r) => r.enabled && isRegexSafe(r.pattern, r.flags))
     .map((r) => ({
       type: `CUSTOM:${r.id}`,
       detect(text: string) {
