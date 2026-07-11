@@ -44,6 +44,15 @@ const RULE_PRESETS: Record<string, { icon: string; pattern: string; flags: strin
   address: { icon: '📍', pattern: '\\d+\\s+[A-Za-z]+(?:\\s+[A-Za-z]+){1,5}(?:,\\s*[A-Za-z]+)?', flags: 'g', desc: 'Detects street addresses with numbers', replacement: '[ADDRESS]' },
 };
 
+const PRESET_NAMES: Record<string, string> = {
+  phone: 'Phone numbers',
+  id: 'ID numbers',
+  account: 'Account numbers',
+  address: 'Addresses',
+  keyword: 'Specific text',
+  custom: 'Custom pattern',
+};
+
 const RULE_ICONS: Record<string, string> = {
   phone: '📞', id: '🪪', account: '🏦', address: '📍', keyword: '🔤', custom: '⚙️',
 };
@@ -447,16 +456,21 @@ typeGrid.addEventListener('click', (e) => {
   suggestionsGroup.style.display = selectedType === 'custom' ? 'block' : 'none';
   replacementGroup.style.display = 'block';
 
-  // Apply default replacement label if empty
-  if (selectedType && selectedType !== 'keyword' && selectedType !== 'custom') {
-    const preset = RULE_PRESETS[selectedType];
-    if (preset) {
-      ruleReplacementIn.value = preset.replacement;
+  // Apply default replacement label and name if empty
+  if (selectedType) {
+    if (!ruleNameIn.value.trim()) {
+      ruleNameIn.value = PRESET_NAMES[selectedType] || '';
     }
-  } else if (selectedType === 'keyword') {
-    ruleReplacementIn.value = '[REDACTED]';
-  } else if (selectedType === 'custom') {
-    ruleReplacementIn.value = '[CUSTOM]';
+    if (selectedType !== 'keyword' && selectedType !== 'custom') {
+      const preset = RULE_PRESETS[selectedType];
+      if (preset) {
+        ruleReplacementIn.value = preset.replacement;
+      }
+    } else if (selectedType === 'keyword') {
+      ruleReplacementIn.value = '[REDACTED]';
+    } else if (selectedType === 'custom') {
+      ruleReplacementIn.value = '[CUSTOM]';
+    }
   }
 
   updateSaveState();

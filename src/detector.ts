@@ -56,7 +56,14 @@ const FRIENDLY: Record<string, string> = {
   CUSTOM: 'custom',
 };
 
+/** Map of custom/built-in rule IDs to their friendly display names. */
+export const customRuleNames = new Map<string, string>();
+
 export function labelFor(type: string): string {
+  if (type.startsWith('CUSTOM:')) {
+    const id = type.slice(7);
+    return customRuleNames.get(id) || 'custom rule';
+  }
   return FRIENDLY[type] ?? type.toLowerCase().replace(/_/g, ' ');
 }
 
@@ -151,6 +158,11 @@ let customDetectors: Detector[] = [];
 
 /** Call this after loading CustomRule[] from storage to update the live detector set. */
 export function applyCustomRules(rules: CustomRule[]): void {
+  customRuleNames.clear();
+  for (const r of rules) {
+    customRuleNames.set(r.id, r.name);
+  }
+
   customDetectors = rules
     .filter((r) => r.enabled && isRegexSafe(r.pattern, r.flags))
     .map((r) => ({

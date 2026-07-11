@@ -220,7 +220,7 @@ const BUILTIN_RULES: CustomRule[] = [
   {
     id: 'builtin-drivers-license',
     name: "Driver's License / Permit ID",
-    pattern: '\\b[A-Za-z]\\d{4}-\\d{5}-\\d{5}\\b|\\b[A-Za-z0-9]{6,12}\\b',
+    pattern: '\\b[A-Za-z]\\d{4}-\\d{5}-\\d{5}\\b|\\b(?=.*\\d)[A-Za-z0-9]{6,12}\\b',
     flags: 'gi',
     replacement: '[LICENSE-ID]',
     enabled: false,
@@ -240,7 +240,28 @@ const BUILTIN_RULES: CustomRule[] = [
 export async function getCustomRules(): Promise<CustomRule[]> {
   return new Promise((resolve) => {
     chrome.storage.local.get('customRules', (v) => {
-      const stored: CustomRule[] = v?.customRules ?? [];
+      let stored: CustomRule[] = v?.customRules ?? [];
+      let updated = false;
+
+      // Migrate existing stored driver's license rule if it uses the old pattern
+      stored = stored.map((r) => {
+        if (
+          r.id === 'builtin-drivers-license' &&
+          r.pattern === '\\b[A-Za-z]\\d{4}-\\d{5}-\\d{5}\\b|\\b[A-Za-z0-9]{6,12}\\b'
+        ) {
+          updated = true;
+          return {
+            ...r,
+            pattern: '\\b[A-Za-z]\\d{4}-\\d{5}-\\d{5}\\b|\\b(?=.*\\d)[A-Za-z0-9]{6,12}\\b',
+          };
+        }
+        return r;
+      });
+
+      if (updated) {
+        chrome.storage.local.set({ customRules: stored });
+      }
+
       // Merge built-ins: add any missing built-in IDs
       const storedIds = new Set(stored.map((r) => r.id));
       const merged = [...stored];
