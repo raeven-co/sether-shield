@@ -1,0 +1,83 @@
+{
+  "extName": {
+    "message": "Sether Shield — Protection des données pour IA"
+  },
+  "extDescription": {
+    "message": "Détecte les données personnelles dans vos prompts avant qu'elles n'atteignent ChatGPT, Claude ou Gemini. 100% local — rien ne quitte votre navigateur."
+  },
+  "commandTriggerScan": {
+    "message": "Déclencher l'analyse PII sur la page courante"
+  },
+  "protectionLabel": {
+    "message": "Protection"
+  },
+  "statusOn": {
+    "message": "Activé"
+  },
+  "statusPaused": {
+    "message": "En pause"
+  },
+  "thisSite": {
+    "message": "Ce site"
+  },
+  "enabled": {
+    "message": "Activé"
+  },
+  "disabled": {
+    "message": "Désactivé"
+  },
+  "promptsScrubbed": {
+    "message": "prompts nettoyés"
+  },
+  "piiCaught": {
+    "message": "données détectées"
+  },
+  "redactionHistory": {
+    "message": "Historique des rédactions"
+  },
+  "clearAll": {
+    "message": "Tout effacer"
+  },
+  "noHistory": {
+    "message": "Aucune rédaction enregistrée."
+  },
+  "nothingDetected": {
+    "message": "Rien de sensible détecté"
+  },
+  "keepTyping": {
+    "message": "Continuez à taper — je signalerai les e-mails, numéros, cartes et plus avant l'envoi."
+  },
+  "scrubPrompt": {
+    "message": "Tout nettoyer"
+  },
+  "pausedMessage": {
+    "message": "En pause. Réactivez depuis l'icône de la barre d'outils."
+  },
+  "accept": {
+    "message": "Accepter"
+  },
+  "reject": {
+    "message": "Rejeter"
+  },
+  "dismiss": {
+    "message": "Ignorer"
+  },
+  "headsUp": {
+    "message": "Attention — votre prompt contient encore $COUNT$ élément(s) sensible(s).",
+    "placeholders": {
+      "COUNT": { "content": "$1" }
+    }
+  },
+  "localPrivacy": {
+    "message": "100% local — rien ne quitte votre navigateur."
+  },
+  "shortcutHint": {
+    "message": "Raccourci : Alt+Maj+S"
+  },
+  "footerPrivacy": {
+    "message": "100% local. Aucune donnée ne quitte votre navigateur."
+  },
+  "footerPartOf": {
+    "message": "Fait partie de"
+  }
+}

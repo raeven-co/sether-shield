@@ -1,7 +1,7 @@
 # Sether Shield
 
 > Catches personal data in your prompt **before** it reaches ChatGPT, Claude, or
-> Gemini. 100% local — nothing leaves your browser.
+> Gemini. 100% local, nothing leaves your browser.
 
 The consumer/zero-code front door to [Sether](https://setherai.vercel.app). The
 npm library and the hosted gateway protect *your app's* traffic; Sether Shield

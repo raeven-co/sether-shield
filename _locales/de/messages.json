@@ -1,0 +1,83 @@
+{
+  "extName": {
+    "message": "Sether Shield — PII-Schutz für KI-Chat"
+  },
+  "extDescription": {
+    "message": "Erkennt persönliche Daten in Ihren Prompts, bevor sie ChatGPT, Claude oder Gemini erreichen. 100% lokal — nichts verlässt Ihren Browser."
+  },
+  "commandTriggerScan": {
+    "message": "PII-Scan auf der aktuellen Seite auslösen"
+  },
+  "protectionLabel": {
+    "message": "Schutz"
+  },
+  "statusOn": {
+    "message": "An"
+  },
+  "statusPaused": {
+    "message": "Pausiert"
+  },
+  "thisSite": {
+    "message": "Diese Seite"
+  },
+  "enabled": {
+    "message": "Aktiviert"
+  },
+  "disabled": {
+    "message": "Deaktiviert"
+  },
+  "promptsScrubbed": {
+    "message": "Prompts bereinigt"
+  },
+  "piiCaught": {
+    "message": "Daten erkannt"
+  },
+  "redactionHistory": {
+    "message": "Schwärzungsverlauf"
+  },
+  "clearAll": {
+    "message": "Alles löschen"
+  },
+  "noHistory": {
+    "message": "Noch keine Schwärzungen gespeichert."
+  },
+  "nothingDetected": {
+    "message": "Nichts Sensibles erkannt"
+  },
+  "keepTyping": {
+    "message": "Weiter tippen — ich markiere E-Mails, Telefonnummern, Karten und mehr vor dem Senden."
+  },
+  "scrubPrompt": {
+    "message": "Alles bereinigen"
+  },
+  "pausedMessage": {
+    "message": "Pausiert. Über das Symbolleisten-Icon wieder aktivieren."
+  },
+  "accept": {
+    "message": "Akzeptieren"
+  },
+  "reject": {
+    "message": "Ablehnen"
+  },
+  "dismiss": {
+    "message": "Verwerfen"
+  },
+  "headsUp": {
+    "message": "Achtung — Ihr Prompt enthält noch $COUNT$ sensible(s) Element(e).",
+    "placeholders": {
+      "COUNT": { "content": "$1" }
+    }
+  },
+  "localPrivacy": {
+    "message": "100% lokal — nichts verlässt Ihren Browser."
+  },
+  "shortcutHint": {
+    "message": "Tastenkürzel: Alt+Umschalt+S"
+  },
+  "footerPrivacy": {
+    "message": "100% lokal. Keine Daten verlassen Ihren Browser."
+  },
+  "footerPartOf": {
+    "message": "Teil von"
+  }
+}

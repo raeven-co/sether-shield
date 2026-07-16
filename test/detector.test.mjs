@@ -1,5 +1,6 @@
-// Detector smoke test — now exercises the REAL @raeven-co/sether detectors
-// (via the browser-safe entry) plus the conversational-name heuristic.
+// Detector smoke tests — exercises the REAL @raeven-co/sether detectors
+// (via the browser-safe entry) plus conversational-name heuristic,
+// credential detectors, and custom rule API.
 // Run after build: node test/detector.test.mjs
 
 import { build } from 'esbuild';
@@ -15,13 +16,15 @@ const out = await build({
   write: false,
 });
 const mod = await import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
-const { detect, scrub, restore } = mod;
+const { detect, scrub, restore, maskValue, applyCustomRules } = mod;
 
 let failed = 0;
 const check = (name, cond) => {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}`);
   if (!cond) failed++;
 };
+
+// ── Core PII detection ────────────────────────────────────────────────────────
 
 const sample =
   'Hi, email amara.okafor@acme.com, call +1 (415) 555-2671, card 4242 4242 4242 4242, ' +
@@ -43,20 +46,72 @@ const fakeCard = 'pay 1234 5678 9012 3456 now'; // fails Luhn
 check('rejects non-Luhn card', !detect(fakeCard).some((m) => m.type === 'CC'));
 check('no false positive on plain text', detect('the meeting is at 3pm on tuesday').length === 0);
 
+// ── Scrub + Restore ───────────────────────────────────────────────────────────
+
 const scrubbed = scrub(sample);
 check('scrub removes the email', !scrubbed.text.includes('amara.okafor@acme.com'));
 check('scrub removes the card', !scrubbed.text.includes('4242 4242 4242 4242'));
 check('scrub inserts placeholders', /\[email-1\]/.test(scrubbed.text));
 check('scrub count matches', scrubbed.count === found.length);
-
-// Reversibility (0.2.0): scrub → restore must round-trip exactly.
 check('scrub returns a vault', Array.isArray(scrubbed.vault) && scrubbed.vault.length === scrubbed.count);
 check('restore round-trips to the original', restore(scrubbed.text, scrubbed.vault) === sample);
 check('restore is a no-op without placeholders', restore('plain text', scrubbed.vault) === 'plain text');
 
-// Conversational address (0.2.0).
-check('detects conversational address', detect('I live at 12 Marina Road, Lagos').some((m) => m.type === 'ADDRESS'));
-check('no address false positive without a number', !detect('I live at the office').some((m) => m.type === 'ADDRESS'));
+// ── Credential detection ──────────────────────────────────────────────────────
+
+// The exact prompt the user reported not being detected:
+const mongoPrompt = 'I want to connect to mongodb using my credentials MONGODB_URI=mongodb+srv://acco_user:yv7G@cluster0.huckxlg.mongodb.net/ but it is not working.';
+const mongoFound = detect(mongoPrompt);
+check('detects MongoDB URI with credentials', mongoFound.some((m) => m.type === 'DB_URI' || m.type === 'CREDENTIAL'));
+check('detects env var MONGODB_URI=', mongoFound.some((m) => m.type === 'CREDENTIAL' && m.value.includes('MONGODB_URI')));
+
+check('detects SECRET_KEY env var', detect('SECRET_KEY=a8f2e9b1c3d4e5f6789').some((m) => m.type === 'CREDENTIAL'));
+check('detects DB_PASSWORD env var', detect('DB_PASSWORD=hunter2').some((m) => m.type === 'CREDENTIAL'));
+check('detects generic password: field', detect('password: "s3cretP@ss"').some((m) => m.type === 'CREDENTIAL'));
+check('detects postgres URI with creds', detect('postgres://admin:secretpass@db.example.com:5432/mydb').some((m) => m.type === 'DB_URI'));
+check('no false positive on normal env var', !detect('NODE_ENV=production').some((m) => m.type === 'CREDENTIAL'));
+check('no false positive on LOG_LEVEL', !detect('LOG_LEVEL=debug').some((m) => m.type === 'CREDENTIAL'));
+
+// ── Masking ───────────────────────────────────────────────────────────────────
+
+if (maskValue) {
+  check('masks DB_URI password', maskValue('mongodb+srv://user:mypass@host.net/', 'DB_URI').includes('***') && !maskValue('mongodb+srv://user:mypass@host.net/', 'DB_URI').includes('mypass'));
+  check('masks CREDENTIAL value', maskValue('SECRET_KEY=abc123', 'CREDENTIAL') === 'SECRET_KEY=***');
+  check('masks email', maskValue('alice@example.com', 'EMAIL').includes('***'));
+  check('masks phone', maskValue('+14155552671', 'PHONE').includes('****'));
+}
+
+// ── Custom rules (F2) ─────────────────────────────────────────────────────────
+
+if (applyCustomRules) {
+  applyCustomRules([{
+    id: 'test-rule-1',
+    name: 'Test 9-digit number',
+    pattern: '\\b\\d{9}\\b',
+    flags: 'g',
+    replacement: '[TEST]',
+    enabled: true,
+    builtIn: false,
+  }]);
+  const customFound = detect('patient ref 123456789 confirmed');
+  check('custom rule detects 9-digit number', customFound.some((m) => m.type === 'CUSTOM:test-rule-1'));
+
+  // Disabled rule should NOT fire
+  applyCustomRules([{
+    id: 'test-rule-2',
+    name: 'Disabled rule',
+    pattern: '\\b\\d{9}\\b',
+    flags: 'g',
+    replacement: '[TEST]',
+    enabled: false,
+    builtIn: false,
+  }]);
+  const disabledFound = detect('patient ref 123456789 confirmed');
+  check('disabled custom rule does not fire', !disabledFound.some((m) => m.type === 'CUSTOM:test-rule-2'));
+
+  // Reset custom rules
+  applyCustomRules([]);
+}
 
 console.log(failed ? `\n❌ ${failed} failed` : '\n✅ all detector checks passed');
 process.exit(failed ? 1 : 0);

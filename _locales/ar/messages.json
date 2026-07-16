@@ -1,0 +1,83 @@
+{
+  "extName": {
+    "message": "Sether Shield — حماية البيانات للدردشة مع الذكاء الاصطناعي"
+  },
+  "extDescription": {
+    "message": "يكتشف البيانات الشخصية في مطالباتك قبل أن تصل إلى ChatGPT أو Claude أو Gemini. محلي 100% — لا شيء يغادر متصفحك."
+  },
+  "commandTriggerScan": {
+    "message": "تشغيل فحص البيانات الشخصية في الصفحة الحالية"
+  },
+  "protectionLabel": {
+    "message": "الحماية"
+  },
+  "statusOn": {
+    "message": "مفعّل"
+  },
+  "statusPaused": {
+    "message": "متوقف"
+  },
+  "thisSite": {
+    "message": "هذا الموقع"
+  },
+  "enabled": {
+    "message": "مفعّل"
+  },
+  "disabled": {
+    "message": "معطّل"
+  },
+  "promptsScrubbed": {
+    "message": "مطالبات تم تنظيفها"
+  },
+  "piiCaught": {
+    "message": "بيانات تم اكتشافها"
+  },
+  "redactionHistory": {
+    "message": "سجل التنقيح"
+  },
+  "clearAll": {
+    "message": "مسح الكل"
+  },
+  "noHistory": {
+    "message": "لا توجد تنقيحات مسجلة بعد."
+  },
+  "nothingDetected": {
+    "message": "لم يتم اكتشاف أي بيانات حساسة"
+  },
+  "keepTyping": {
+    "message": "تابع الكتابة — سأنبهك للبريد الإلكتروني وأرقام الهاتف والبطاقات والمزيد قبل الإرسال."
+  },
+  "scrubPrompt": {
+    "message": "تنظيف الكل"
+  },
+  "pausedMessage": {
+    "message": "متوقف. أعد التفعيل من أيقونة شريط الأدوات."
+  },
+  "accept": {
+    "message": "قبول"
+  },
+  "reject": {
+    "message": "رفض"
+  },
+  "dismiss": {
+    "message": "تجاهل"
+  },
+  "headsUp": {
+    "message": "تنبيه — مطالبتك لا تزال تحتوي على $COUNT$ عنصر(عناصر) حساسة.",
+    "placeholders": {
+      "COUNT": { "content": "$1" }
+    }
+  },
+  "localPrivacy": {
+    "message": "محلي 100% — لا شيء يغادر متصفحك."
+  },
+  "shortcutHint": {
+    "message": "اختصار: Alt+Shift+S"
+  },
+  "footerPrivacy": {
+    "message": "محلي 100%. لا تغادر أي بيانات متصفحك."
+  },
+  "footerPartOf": {
+    "message": "جزء من"
+  }
+}

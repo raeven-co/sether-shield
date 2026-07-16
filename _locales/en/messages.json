@@ -1,0 +1,92 @@
+{
+  "extName": {
+    "message": "Sether Shield — PII guard for AI chat"
+  },
+  "extDescription": {
+    "message": "Catches personal data in your prompt before it reaches ChatGPT, Claude, or Gemini. 100% local, nothing leaves your browser."
+  },
+  "commandTriggerScan": {
+    "message": "Trigger PII scan on current page"
+  },
+  "protectionLabel": {
+    "message": "Protection"
+  },
+  "statusOn": {
+    "message": "On"
+  },
+  "statusPaused": {
+    "message": "Paused"
+  },
+  "thisSite": {
+    "message": "This site"
+  },
+  "enabled": {
+    "message": "Enabled"
+  },
+  "disabled": {
+    "message": "Disabled"
+  },
+  "promptsScrubbed": {
+    "message": "prompts scrubbed"
+  },
+  "piiCaught": {
+    "message": "PII caught"
+  },
+  "redactionHistory": {
+    "message": "Redaction History"
+  },
+  "clearAll": {
+    "message": "Clear All"
+  },
+  "noHistory": {
+    "message": "No redactions recorded yet."
+  },
+  "nothingDetected": {
+    "message": "Nothing sensitive detected"
+  },
+  "keepTyping": {
+    "message": "Keep typing, I'll flag emails, phone numbers, cards, secrets and more before you send."
+  },
+  "scrubPrompt": {
+    "message": "Scrub all"
+  },
+  "pausedMessage": {
+    "message": "Paused. Turn it back on from the toolbar icon."
+  },
+  "accept": {
+    "message": "Accept"
+  },
+  "reject": {
+    "message": "Reject"
+  },
+  "dismiss": {
+    "message": "Dismiss"
+  },
+  "headsUp": {
+    "message": "Heads up — your prompt still has $COUNT$ sensitive item(s).",
+    "placeholders": {
+      "COUNT": { "content": "$1" }
+    }
+  },
+  "localPrivacy": {
+    "message": "100% local, nothing leaves your browser."
+  },
+  "shortcutHint": {
+    "message": "Shortcut: Alt+Shift+S"
+  },
+  "footerPrivacy": {
+    "message": "100% local. No data leaves your browser. No telemetry."
+  },
+  "footerPartOf": {
+    "message": "Part of"
+  },
+  "autoRedactLabel": {
+    "message": "Auto-redact (2s delay)"
+  },
+  "autoRedactOn": {
+    "message": "Enabled"
+  },
+  "autoRedactOff": {
+    "message": "Disabled"
+  }
+}
