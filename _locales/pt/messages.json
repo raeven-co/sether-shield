@@ -65,7 +65,9 @@
   "headsUp": {
     "message": "Atenção — seu prompt ainda tem $COUNT$ item(ns) sensível(is).",
     "placeholders": {
-      "COUNT": { "content": "$1" }
+      "COUNT": {
+        "content": "$1"
+      }
     }
   },
   "localPrivacy": {
@@ -79,5 +81,53 @@
   },
   "footerPartOf": {
     "message": "Parte de"
+  },
+  "autoRedactLabel": {
+    "message": "Redação automática"
+  },
+  "autoRedactOn": {
+    "message": "Redação automática ativada"
+  },
+  "autoRedactOff": {
+    "message": "Redação automática desativada"
+  },
+  "maskMode": {
+    "message": "Mascarar"
+  },
+  "decoyMode": {
+    "message": "Isca"
+  },
+  "decoyAll": {
+    "message": "Substituir tudo por iscas"
+  },
+  "restoreOriginals": {
+    "message": "Restaurar originais"
+  },
+  "pickDecoy": {
+    "message": "Escolher uma isca"
+  },
+  "useDecoy": {
+    "message": "Usar esta isca"
+  },
+  "moreDecoys": {
+    "message": "Mais"
+  },
+  "decoysInReply": {
+    "message": "Suas iscas aparecem nesta resposta"
+  },
+  "copyRealValues": {
+    "message": "Copiar resposta com valores reais"
+  },
+  "copiedRealValues": {
+    "message": "Copiado com valores reais"
+  },
+  "copyFailed": {
+    "message": "Falha ao copiar"
+  },
+  "responseGuardIntro": {
+    "message": "Revise esta resposta da IA antes de copiá-la."
+  },
+  "decoyModeLabel": {
+    "message": "Modo isca"
   }
 }

@@ -65,7 +65,9 @@
   "headsUp": {
     "message": "Atención — tu prompt aún tiene $COUNT$ elemento(s) sensible(s).",
     "placeholders": {
-      "COUNT": { "content": "$1" }
+      "COUNT": {
+        "content": "$1"
+      }
     }
   },
   "localPrivacy": {
@@ -79,5 +81,53 @@
   },
   "footerPartOf": {
     "message": "Parte de"
+  },
+  "autoRedactLabel": {
+    "message": "Redacción automática"
+  },
+  "autoRedactOn": {
+    "message": "Redacción automática activada"
+  },
+  "autoRedactOff": {
+    "message": "Redacción automática desactivada"
+  },
+  "maskMode": {
+    "message": "Enmascarar"
+  },
+  "decoyMode": {
+    "message": "Señuelo"
+  },
+  "decoyAll": {
+    "message": "Reemplazar todo con señuelos"
+  },
+  "restoreOriginals": {
+    "message": "Restaurar originales"
+  },
+  "pickDecoy": {
+    "message": "Elegir un señuelo"
+  },
+  "useDecoy": {
+    "message": "Usar este señuelo"
+  },
+  "moreDecoys": {
+    "message": "Más"
+  },
+  "decoysInReply": {
+    "message": "Tus señuelos aparecen en esta respuesta"
+  },
+  "copyRealValues": {
+    "message": "Copiar respuesta con valores reales"
+  },
+  "copiedRealValues": {
+    "message": "Copiado con valores reales"
+  },
+  "copyFailed": {
+    "message": "Error al copiar"
+  },
+  "responseGuardIntro": {
+    "message": "Revisa esta respuesta de IA antes de copiarla."
+  },
+  "decoyModeLabel": {
+    "message": "Modo señuelo"
   }
 }

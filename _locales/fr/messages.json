@@ -65,7 +65,9 @@
   "headsUp": {
     "message": "Attention — votre prompt contient encore $COUNT$ élément(s) sensible(s).",
     "placeholders": {
-      "COUNT": { "content": "$1" }
+      "COUNT": {
+        "content": "$1"
+      }
     }
   },
   "localPrivacy": {
@@ -79,5 +81,53 @@
   },
   "footerPartOf": {
     "message": "Fait partie de"
+  },
+  "autoRedactLabel": {
+    "message": "Masquage automatique"
+  },
+  "autoRedactOn": {
+    "message": "Masquage automatique activé"
+  },
+  "autoRedactOff": {
+    "message": "Masquage automatique désactivé"
+  },
+  "maskMode": {
+    "message": "Masquer"
+  },
+  "decoyMode": {
+    "message": "Leurre"
+  },
+  "decoyAll": {
+    "message": "Tout remplacer par des leurres"
+  },
+  "restoreOriginals": {
+    "message": "Restaurer les originaux"
+  },
+  "pickDecoy": {
+    "message": "Choisir un leurre"
+  },
+  "useDecoy": {
+    "message": "Utiliser ce leurre"
+  },
+  "moreDecoys": {
+    "message": "Plus"
+  },
+  "decoysInReply": {
+    "message": "Vos leurres apparaissent dans cette réponse"
+  },
+  "copyRealValues": {
+    "message": "Copier la réponse avec les vraies valeurs"
+  },
+  "copiedRealValues": {
+    "message": "Copié avec les vraies valeurs"
+  },
+  "copyFailed": {
+    "message": "Échec de la copie"
+  },
+  "responseGuardIntro": {
+    "message": "Vérifiez cette réponse IA avant de la copier."
+  },
+  "decoyModeLabel": {
+    "message": "Mode leurre"
   }
 }

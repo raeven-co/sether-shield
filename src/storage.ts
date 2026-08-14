@@ -325,22 +325,29 @@ export async function resetBuiltinRules(): Promise<void> {
 
 let cachedMessages: Record<string, string> = {};
 
+/** Resolve a BCP-47-ish tag ("fr", "zh-CN", "pt_BR") to a locale we ship, else "en". */
+function resolveLocale(lang: string): string {
+  const tag = lang.replace('-', '_');
+  if (tag in LOCALES) return tag;
+  const base = tag.split('_')[0];
+  if (base === 'zh') return 'zh_CN';
+  // Match on the base tag so "pt_BR" -> "pt", "de_AT" -> "de".
+  const match = Object.keys(LOCALES).find((l) => l.split('_')[0] === base);
+  return match ?? 'en';
+}
+
 export async function loadTranslations(): Promise<void> {
+  // Seed English first so a failure below still renders real copy, never raw keys.
+  cachedMessages = { ...LOCALES['en'] };
   try {
     const settings = await getSettings();
-    const uiLang = (chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : 'en').replace('-', '_');
-    const lang = settings.language ?? uiLang ?? 'en';
-    
-    const checkLocales = ['en', 'fr', 'es', 'pt', 'de', 'ar', 'zh_CN'];
-    let targetLocale = checkLocales.includes(lang) ? lang : 'en';
-    if (lang.startsWith('zh')) {
-      targetLocale = 'zh_CN';
-    }
-    
-    const data = LOCALES[targetLocale] || LOCALES['en'];
-    cachedMessages = { ...data };
-  } catch (err) {
-    console.error('Failed to load translations:', err);
+    const uiLang = chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage() : 'en';
+    const target = resolveLocale(settings.language ?? uiLang ?? 'en');
+    // Layer the target over English so a key missing from a translation falls back
+    // to English copy rather than disappearing.
+    cachedMessages = { ...LOCALES['en'], ...LOCALES[target] };
+  } catch {
+    // Storage or chrome.i18n unavailable — English seed above stands.
   }
 }
 

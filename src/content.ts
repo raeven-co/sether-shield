@@ -11,6 +11,7 @@
 //  • Shield Score events (F4) — fires exposure events on paste/scrub
 
 import { detect, labelFor, maskValue, applyCustomRules, type Match } from './detector.js';
+import { AliasVault, suggestAliases } from '@raeven-co/sether/browser';
 import {
   isSiteEnabled,
   bumpStats,
@@ -18,6 +19,8 @@ import {
   loadTranslations,
   translate,
   getCustomRules,
+  getSettings,
+  setSettings,
 } from './storage.js';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -68,6 +71,18 @@ const FALLBACK: Record<string, string> = {
   keepTyping: "Keep typing, I'll flag emails, phone numbers, cards, secrets and more before you send.",
   scrubPrompt: 'Scrub all',
   headsUp: 'Heads up — your prompt still has $1 sensitive item(s).',
+  maskMode: 'Mask',
+  decoyMode: 'Decoy',
+  decoyAll: 'Swap all for decoys',
+  restoreOriginals: 'Restore originals',
+  pickDecoy: 'Pick a decoy',
+  useDecoy: 'Use this decoy',
+  moreDecoys: 'More',
+  decoysInReply: 'Your decoys appeared in this reply',
+  copyRealValues: 'Copy reply with real values',
+  copiedRealValues: 'Copied with real values',
+  copyFailed: 'Copy failed',
+  responseGuardIntro: 'Review this AI reply before copying it anywhere.',
 };
 
 /** Get an i18n message, falling back to English hardcoded strings. */
@@ -88,6 +103,26 @@ let globalEnabled = true;
 let siteEnabled = true;
 let autoRedactEnabled = false;
 let currentMatches: Match[] = [];
+
+/** Replacement strategy: false = mask ("e***@***.com"), true = decoy mode. */
+let aliasMode = false;
+
+/**
+ * Session vault: original ↔ replacement for everything we swapped out this
+ * tab session (decoys AND masks). Lives in content-script memory ONLY — never
+ * chrome.storage, never disk. Powers "Restore originals" and the response
+ * guard's "copy reply with real values".
+ */
+const aliasVault = new AliasVault();
+
+/** matchKey → decoy the user picked from the suggestion chips. */
+const chosenDecoys = new Map<string, string>();
+
+/** matchKey → cached decoy suggestions so re-renders don't reshuffle. */
+const suggestionCache = new Map<string, string[]>();
+
+/** Which match row has its suggestion chips expanded (null = none). */
+let expandedSuggestKey: string | null = null;
 
 /** Session-scoped dismissed suggestions. Key = `type:value`. */
 const dismissedKeys = new Set<string>();
@@ -138,7 +173,11 @@ function addResponseGuardDismissed(key: string): void {
 }
 
 // UI instances
-let shieldUI: ShieldUI;
+let shieldUI: ShieldUI | undefined;
+
+/** True once the shield is live on this origin (allowlisted + listeners attached).
+ *  Flipped by activate() / deactivate(), which are both idempotent. */
+let activated = false;
 
 // Cleanup references for context invalidation
 let onInputDebounced: ((...args: any[]) => void) | undefined;
@@ -153,6 +192,89 @@ let responseGuardObserver: MutationObserver | undefined;
 
 function matchKey(m: Match): string {
   return `${m.type}:${m.value}`;
+}
+
+/**
+ * Every replacement actually written into a page this session:
+ * replacement → original. First writer wins (a later identical mask for a
+ * different original stays unrestorable rather than mis-restoring). Unlike the
+ * vault, entries here are never re-pointed, so a decoy that was applied and
+ * later superseded by a new pick still restores correctly.
+ */
+const replacementLog = new Map<string, string>();
+
+/**
+ * Values we already swapped in are not PII — a decoy email is detector-visible
+ * by design, and re-flagging it would loop the suggestion UI forever.
+ */
+function isAppliedReplacement(value: string): boolean {
+  return replacementLog.has(value) || aliasVault.originalOf(value) !== undefined;
+}
+
+/** The decoy standing in for this match: the user's pick, else a stable
+ *  generated one (same original always gets the same decoy this session). */
+function decoyFor(m: Match): string {
+  const chosen = chosenDecoys.get(matchKey(m));
+  if (chosen) return chosen;
+  return aliasVault.aliasFor(m.type, m.value);
+}
+
+/** What scrubbing would insert for this match under the current mode. */
+function replacementFor(m: Match): string {
+  return aliasMode ? decoyFor(m) : maskValue(m.value, m.type);
+}
+
+/** Decoy suggestions for a match row, cached per session so re-renders are stable. */
+function suggestionsFor(m: Match): string[] {
+  const key = matchKey(m);
+  let list = suggestionCache.get(key);
+  if (!list || list.length === 0) {
+    list = suggestAliases(m.type, m.value, 3);
+    suggestionCache.set(key, list);
+  }
+  return list;
+}
+
+/** Record a replacement in the session vault + log so it can be restored later.
+ *  Collisions (two originals masking to the same string) are skipped — the
+ *  first mapping wins and the second stays unrestorable-by-text-swap. */
+function recordReplacement(original: string, replacement: string, type: string): void {
+  if (original === replacement) return;
+  if (!replacementLog.has(replacement)) replacementLog.set(replacement, original);
+  aliasVault.set(original, replacement, type);
+}
+
+/** All restorable pairs, longest replacement first so substring replacements
+ *  cannot clobber a longer one during substitution. */
+function restorePairs(): [replacement: string, original: string][] {
+  return [...replacementLog.entries()].sort((a, b) => b[0].length - a[0].length);
+}
+
+/** Swap every logged replacement in `text` back to its original value. */
+function restoreText(text: string): string {
+  let out = text;
+  for (const [replacement, original] of restorePairs()) {
+    if (replacement.length === 0) continue;
+    out = out.split(replacement).join(original);
+  }
+  return out;
+}
+
+/**
+ * After a value is replaced once, sweep any REMAINING occurrences of it in the
+ * editor. Detection is anchor-based ("my name is Godfrey Lebo"), so a second
+ * unanchored mention ("Regards, Godfrey Lebo") produces no match — but once
+ * the user decided the value is sensitive, every occurrence is.
+ */
+function sweepRemaining(el: HTMLElement): void {
+  if (replacementLog.size === 0) return;
+  const text = getText(el);
+  let swept = text;
+  for (const [replacement, original] of replacementLog.entries()) {
+    if (original.length < 4) continue; // too short to sweep safely ("Al", "Bo")
+    swept = swept.split(original).join(replacement);
+  }
+  if (swept !== text) setText(el, swept);
 }
 
 function isEditor(el: HTMLElement): boolean {
@@ -472,8 +594,11 @@ function isContextValid(): boolean {
   }
 }
 
-function cleanupInvalidatedContext(): void {
+/** Remove every listener, timer, observer and DOM node this content script owns.
+ *  Safe to call when already torn down. */
+function teardown(): void {
   try {
+    activated = false;
     if (scanIntervalId) clearInterval(scanIntervalId);
     if (autoRedactTimeoutId) {
       clearTimeout(autoRedactTimeoutId);
@@ -492,18 +617,21 @@ function cleanupInvalidatedContext(): void {
     }
     document.removeEventListener('keydown', onKeydown, true);
     responseGuardObserver?.disconnect();
+    responseGuardObserver = undefined;
 
     const host = document.getElementById('sether-shield-host');
     if (host) host.remove();
+    document.getElementById('sether-shield-global-styles')?.remove();
   } catch {}
 }
 
 function refresh(): void {
   try {
     if (!isContextValid()) {
-      cleanupInvalidatedContext();
+      teardown();
       return;
     }
+    if (!activated || !shieldUI) return;
     if (!globalEnabled || !siteEnabled) {
       currentMatches = [];
       shieldUI.render(null, []);
@@ -519,7 +647,7 @@ function refresh(): void {
       return;
     }
 
-    const rawMatches = detect(text);
+    const rawMatches = detect(text).filter((m) => !isAppliedReplacement(m.value));
 
     // F1: Annotate each match with source='paste'/'typed'
     currentMatches = rawMatches.map((m) => ({
@@ -541,7 +669,8 @@ function onKeydown(e: KeyboardEvent): void {
   
   const activeMatches = currentMatches.filter((m) => !dismissedKeys.has(matchKey(m)));
   if (activeMatches.length > 0) {
-    shieldUI.toast(activeMatches.length);
+    // Reachable only while activated — the keydown listener is attached in activate().
+    shieldUI?.toast(activeMatches.length);
   }
 }
 
@@ -562,7 +691,7 @@ function doScrub(): void {
   if (!el) return;
 
   const text = getText(el);
-  const matches = detect(text);
+  const matches = detect(text).filter((m) => !isAppliedReplacement(m.value));
   const activeMatches = matches.filter((m) => !dismissedKeys.has(matchKey(m)));
   if (activeMatches.length === 0) return;
 
@@ -571,8 +700,9 @@ function doScrub(): void {
 
   let successCount = 0;
   for (const m of reversed) {
-    const replacement = maskValue(m.value, m.type);
+    const replacement = replacementFor(m);
     if (replaceMatchInElement(el, m, replacement)) {
+      recordReplacement(m.value, replacement, m.type);
       const source: 'paste' | 'typed' = isPastedMatch(el, m) ? 'paste' : 'typed';
       addRedactionRecord({
         pageUrl: location.origin,
@@ -586,9 +716,37 @@ function doScrub(): void {
   }
 
   if (successCount > 0) {
+    sweepRemaining(el);
     bumpStats(successCount).catch(() => {});
     setTimeout(refresh, 50);
   }
+}
+
+/**
+ * Restore originals in the active editor: every decoy/mask this session put
+ * into the text is swapped back to its real value. Pure text substitution via
+ * the session vault — works no matter how the user edited around them.
+ */
+function doRestore(): void {
+  const el = activeEditor();
+  if (!el || replacementLog.size === 0) return;
+  const text = getText(el);
+  const restored = restoreText(text);
+  if (restored !== text) {
+    setText(el, restored);
+    setTimeout(refresh, 50);
+  }
+}
+
+/** How many logged replacements are currently present in the editor text. */
+function restorableCount(el: HTMLElement | null): number {
+  if (!el || replacementLog.size === 0) return 0;
+  const text = getText(el);
+  let n = 0;
+  for (const replacement of replacementLog.keys()) {
+    if (text.includes(replacement)) n++;
+  }
+  return n;
 }
 
 function matchesEqual(a: Match[], b: Match[]): boolean {
@@ -622,8 +780,30 @@ function isEchoed(value: string): boolean {
   return pastedPIIValues.has(value);
 }
 
-/** Show an in-panel response guard prompt when echoed PII is found. */
-function showResponseGuardPrompt(matches: Match[], responseEl: HTMLElement): void {
+/** A decoy from this session that the AI echoed back in its reply. */
+interface DecoyEcho {
+  /** The decoy string as it appears in the reply. */
+  alias: string;
+  /** The real value it stands in for. NEVER rendered in full in the UI. */
+  original: string;
+}
+
+/** Which of this session's decoys appear in the given reply text. */
+function decoyEchoesIn(text: string): DecoyEcho[] {
+  const out: DecoyEcho[] = [];
+  for (const [replacement, original] of replacementLog.entries()) {
+    if (responseGuardDismissed.has(`DECOY:${replacement}`)) continue;
+    if (text.includes(replacement)) out.push({ alias: replacement, original });
+  }
+  return out;
+}
+
+/** Show an in-panel response guard prompt when echoed PII or decoys are found. */
+function showResponseGuardPrompt(
+  matches: Match[],
+  decoys: DecoyEcho[],
+  responseEl: HTMLElement,
+): void {
   const echoed = matches.filter(
     (m) => !responseGuardDismissed.has(matchKey(m)) && isEchoed(m.value)
   );
@@ -631,9 +811,10 @@ function showResponseGuardPrompt(matches: Match[], responseEl: HTMLElement): voi
     (m) => !responseGuardDismissed.has(matchKey(m)) && !isEchoed(m.value)
   );
 
-  if (echoed.length === 0 && detected.length === 0) return;
+  if (echoed.length === 0 && detected.length === 0 && decoys.length === 0) return;
 
-  shieldUI.showResponseGuard(echoed, detected, responseEl);
+  // Reachable only while activated — the observer is attached in activate().
+  shieldUI?.showResponseGuard(echoed, detected, decoys, responseEl);
 }
 
 /**
@@ -649,16 +830,20 @@ function initResponseGuard(): void {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       if (!globalEnabled || !siteEnabled) return;
-      if (pastedPIIValues.size === 0) return; // nothing pasted — skip entirely
+      // Nothing pasted AND nothing replaced this session — skip entirely.
+      if (pastedPIIValues.size === 0 && replacementLog.size === 0) return;
 
       for (const sel of AI_RESPONSE_SELECTORS) {
         const nodes = document.querySelectorAll<HTMLElement>(sel);
         nodes.forEach((node) => {
           const text = node.textContent ?? '';
           if (!text.trim()) return;
-          const matches = detect(text);
-          if (matches.length > 0) {
-            showResponseGuardPrompt(matches, node);
+          // Decoys the AI echoed back are EXPECTED — surface them via the
+          // decoy section (with copy-restored), not as leaked PII.
+          const matches = detect(text).filter((m) => !isAppliedReplacement(m.value));
+          const decoys = decoyEchoesIn(text);
+          if (matches.length > 0 || decoys.length > 0) {
+            showResponseGuardPrompt(matches, decoys, node);
           }
         });
       }
@@ -899,27 +1084,52 @@ class ShieldUI {
     let rowsHtml = '';
     activeMatches.forEach((m, idx) => {
       const category = labelFor(m.type);
-      const masked = maskValue(m.value, m.type);
+      const replacement = replacementFor(m);
+      const key = matchKey(m);
       const sourceBadge = m.source === 'paste'
         ? `<span class="src-badge paste">📋 pasted</span>`
         : '';
+      const decoyBadge = aliasMode
+        ? `<span class="src-badge decoy">🎭 decoy</span>`
+        : '';
+
+      // Decoy suggestion chips — expanded for one row at a time.
+      let chipsHtml = '';
+      if (expandedSuggestKey === key) {
+        const chips = suggestionsFor(m)
+          .map(
+            (s, ci) =>
+              `<button class="chip" data-idx="${idx}" data-chip="${ci}" title="${escapeHtml(msg('useDecoy'))}">${escapeHtml(s)}</button>`,
+          )
+          .join('');
+        chipsHtml = `
+          <div class="chips">
+            <span class="chips-label">${escapeHtml(msg('pickDecoy'))}</span>
+            ${chips}
+            <button class="chip chip-more" data-idx="${idx}" title="${escapeHtml(msg('moreDecoys'))}">🎲 ${escapeHtml(msg('moreDecoys'))}</button>
+          </div>`;
+      }
+
       rowsHtml += `
-        <li class="match-row">
+        <li class="match-row${expandedSuggestKey === key ? ' expanded' : ''}">
           <div class="match-info">
             <div class="match-meta">
               <span class="match-dot"></span>
               <span class="match-cat">${escapeHtml(category)}</span>
               ${sourceBadge}
+              ${decoyBadge}
             </div>
             <div class="match-preview">
               <span class="match-orig">${escapeHtml(m.value)}</span>
               <span class="match-arrow">→</span>
-              <span class="match-masked">${escapeHtml(masked)}</span>
+              <span class="match-masked">${escapeHtml(replacement)}</span>
             </div>
+            ${chipsHtml}
           </div>
           <div class="match-actions">
-            <button class="match-accept" data-idx="${idx}" title="Accept suggestion">✓</button>
-            <button class="match-dismiss" data-idx="${idx}" title="Dismiss suggestion">×</button>
+            <button class="match-accept" data-idx="${idx}" title="${escapeHtml(msg('accept'))}">✓</button>
+            <button class="match-suggest" data-idx="${idx}" title="${escapeHtml(msg('pickDecoy'))}">🎭</button>
+            <button class="match-dismiss" data-idx="${idx}" title="${escapeHtml(msg('dismiss'))}">×</button>
           </div>
         </li>
       `;
@@ -930,15 +1140,53 @@ class ShieldUI {
       return;
     }
 
+    // Mode toggle (mask ↔ decoy) + restore button are always available.
+    const modeHtml = `
+      <div class="mode" role="radiogroup" aria-label="Replacement mode">
+        <button class="mode-btn${aliasMode ? '' : ' active'}" data-mode="mask">${escapeHtml(msg('maskMode'))}</button>
+        <button class="mode-btn${aliasMode ? ' active' : ''}" data-mode="decoy">🎭 ${escapeHtml(msg('decoyMode'))}</button>
+      </div>`;
+
+    const nRestorable = restorableCount(this.#activeEl);
+    const restoreHtml =
+      nRestorable > 0
+        ? `<button class="restore" type="button">↩ ${escapeHtml(msg('restoreOriginals'))} (${nRestorable})</button>`
+        : '';
+
     this.#panel.innerHTML = activeMatches.length
       ? `<div class="hd">${activeMatches.length} item${activeMatches.length === 1 ? '' : 's'} to scrub</div>
+         ${modeHtml}
          <ul class="list">${rowsHtml}</ul>
-         <button class="scrub" type="button">${escapeHtml(msg('scrubPrompt'))}</button>${getFooter()}`
+         <button class="scrub" type="button">${escapeHtml(aliasMode ? msg('decoyAll') : msg('scrubPrompt'))}</button>
+         ${restoreHtml}${getFooter()}`
       : `<div class="hd">${escapeHtml(msg('nothingDetected'))}</div>
-         <p class="muted">${escapeHtml(msg('keepTyping'))}</p>${getFooter()}`;
+         ${modeHtml}
+         <p class="muted">${escapeHtml(msg('keepTyping'))}</p>
+         ${restoreHtml}${getFooter()}`;
 
     const newListEl = this.#panel.querySelector('.list');
     if (newListEl) newListEl.scrollTop = scrollTop;
+
+    // Mode toggle listeners
+    this.#panel.querySelectorAll<HTMLButtonElement>('.mode-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const next = btn.getAttribute('data-mode') === 'decoy';
+        if (next === aliasMode) return;
+        aliasMode = next;
+        getSettings()
+          .then((s) => setSettings({ ...s, aliasMode: next }))
+          .catch(() => {});
+        this.#renderPanel(currentMatches);
+        this.#lastRenderedMatches = currentMatches.filter((m) => !dismissedKeys.has(matchKey(m)));
+      });
+    });
+
+    // Restore listener
+    this.#panel.querySelector<HTMLButtonElement>('.restore')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      doRestore();
+    });
 
     // Action listeners
     if (activeMatches.length) {
@@ -947,7 +1195,46 @@ class ShieldUI {
           e.stopPropagation();
           const idx = parseInt(btn.getAttribute('data-idx') || '0', 10);
           const match = activeMatches[idx];
-          if (match) this.#accept(match);
+          if (match) this.#accept(match, replacementFor(match));
+        });
+      });
+
+      this.#panel.querySelectorAll<HTMLButtonElement>('.match-suggest').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.getAttribute('data-idx') || '0', 10);
+          const match = activeMatches[idx];
+          if (!match) return;
+          const key = matchKey(match);
+          expandedSuggestKey = expandedSuggestKey === key ? null : key;
+          this.#renderPanel(currentMatches);
+        });
+      });
+
+      this.#panel.querySelectorAll<HTMLButtonElement>('.chip:not(.chip-more)').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.getAttribute('data-idx') || '0', 10);
+          const ci = parseInt(btn.getAttribute('data-chip') || '0', 10);
+          const match = activeMatches[idx];
+          if (!match) return;
+          const decoy = suggestionsFor(match)[ci];
+          if (!decoy) return;
+          const key = matchKey(match);
+          chosenDecoys.set(key, decoy);
+          expandedSuggestKey = null;
+          this.#accept(match, decoy);
+        });
+      });
+
+      this.#panel.querySelectorAll<HTMLButtonElement>('.chip-more').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.getAttribute('data-idx') || '0', 10);
+          const match = activeMatches[idx];
+          if (!match) return;
+          suggestionCache.delete(matchKey(match)); // reshuffle
+          this.#renderPanel(currentMatches);
         });
       });
 
@@ -967,10 +1254,39 @@ class ShieldUI {
 
 
   /** F3: Show an in-panel response guard prompt. */
-  showResponseGuard(echoed: Match[], detected: Match[], _responseEl: HTMLElement): void {
+  showResponseGuard(
+    echoed: Match[],
+    detected: Match[],
+    decoys: DecoyEcho[],
+    responseEl: HTMLElement,
+  ): void {
     if (!this.#open) this.#toggle();
 
     let rowsHtml = '';
+
+    if (decoys.length > 0) {
+      rowsHtml += `<p class="rg-label rg-decoy">🎭 ${escapeHtml(msg('decoysInReply'))} (${decoys.length}):</p>`;
+      decoys.forEach((d, idx) => {
+        const maskedOriginal = maskValue(d.original, 'DEFAULT');
+        rowsHtml += `
+          <li class="match-row">
+            <div class="match-info">
+              <div class="match-meta">
+                <span class="match-dot decoy-dot"></span>
+                <span class="match-cat">${escapeHtml(msg('decoyMode'))}</span>
+              </div>
+              <div class="match-preview">
+                <span class="match-masked">${escapeHtml(d.alias)}</span>
+                <span class="match-arrow">←</span>
+                <span class="match-orig">${escapeHtml(maskedOriginal)}</span>
+              </div>
+            </div>
+            <div class="match-actions">
+              <button class="rg-skip" data-idx="${idx}" data-kind="decoy" title="${escapeHtml(msg('dismiss'))}">×</button>
+            </div>
+          </li>`;
+      });
+    }
 
     if (echoed.length > 0) {
       rowsHtml += `<p class="rg-label rg-echo">⚠️ Echoed from your input (${echoed.length}):</p>`;
@@ -1021,11 +1337,39 @@ class ShieldUI {
       });
     }
 
+    const copyRestoredHtml =
+      decoys.length > 0
+        ? `<button class="rg-copy-restored" type="button">↩ ${escapeHtml(msg('copyRealValues'))}</button>`
+        : '';
+
     this.#panel.innerHTML = `
       <div class="hd rg-hd">🛡 AI Response Guard</div>
-      <p class="muted">PII found in the AI reply. Review before copying.</p>
+      <p class="muted">${escapeHtml(msg('responseGuardIntro'))}</p>
       <ul class="list">${rowsHtml}</ul>
+      ${copyRestoredHtml}
       ${getFooter()}`;
+
+    // Copy-with-real-values: clipboard gets the reply with every decoy swapped
+    // back to its original. The restored text NEVER touches the page DOM.
+    this.#panel
+      .querySelector<HTMLButtonElement>('.rg-copy-restored')
+      ?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const btn = e.currentTarget as HTMLButtonElement;
+        const replyText = responseEl.textContent ?? '';
+        const restored = restoreText(replyText);
+        navigator.clipboard
+          .writeText(restored)
+          .then(() => {
+            btn.textContent = `✓ ${msg('copiedRealValues')}`;
+            setTimeout(() => {
+              btn.textContent = `↩ ${msg('copyRealValues')}`;
+            }, 2000);
+          })
+          .catch(() => {
+            btn.textContent = msg('copyFailed');
+          });
+      });
 
     // Mask button handlers
     this.#panel.querySelectorAll<HTMLButtonElement>('.rg-mask').forEach((btn) => {
@@ -1043,6 +1387,13 @@ class ShieldUI {
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.getAttribute('data-idx') || '0', 10);
         const kind = btn.getAttribute('data-kind');
+        if (kind === 'decoy') {
+          const d = decoys[idx];
+          if (!d) return;
+          addResponseGuardDismissed(`DECOY:${d.alias}`);
+          refresh();
+          return;
+        }
         const m = kind === 'echo' ? echoed[idx] : detected[idx];
         if (!m) return;
         addResponseGuardDismissed(matchKey(m));
@@ -1051,11 +1402,12 @@ class ShieldUI {
     });
   }
 
-  #accept(m: Match): void {
+  #accept(m: Match, replacement: string): void {
     if (!this.#activeEl) return;
-    const replacement = maskValue(m.value, m.type);
 
     if (replaceMatchInElement(this.#activeEl, m, replacement)) {
+      recordReplacement(m.value, replacement, m.type);
+      sweepRemaining(this.#activeEl);
       addRedactionRecord({
         pageUrl: location.origin,
         category: labelFor(m.type),
@@ -1123,9 +1475,135 @@ function injectGlobalStyles(): void {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
+/** Bring the shield live on this origin. Idempotent.
+ *
+ *  Everything that touches the host page lives here, never in boot(), so that a
+ *  non-allowlisted origin gets zero listeners, zero timers, and zero injected
+ *  DOM. That keeps #sether-shield-host off pages the user never opted into, so
+ *  a page cannot fingerprint the extension by looking for it. */
+function activate(): void {
+  if (activated) return;
+  activated = true;
+
+  injectGlobalStyles();
+
+  shieldUI = new ShieldUI();
+  shieldUI.setEnabled(globalEnabled);
+
+  // F1: Paste tracking (capture-phase, fires before input event)
+  onPasteHandler = (e: ClipboardEvent) => onPaste(e);
+  document.addEventListener('paste', onPasteHandler, true);
+
+  // Auto-detect typed content
+  onInputDebounced = debounce(onInput, 250);
+  onInputRaw = () => {
+    if (autoRedactTimeoutId) {
+      clearTimeout(autoRedactTimeoutId);
+      autoRedactTimeoutId = undefined;
+    }
+    onInputDebounced?.();
+  };
+  onFocusInDebounced = debounce(onFocusIn, 100);
+
+  document.addEventListener('input', onInputRaw, true);
+  document.addEventListener('focusin', onFocusInDebounced, true);
+  document.addEventListener('keydown', onKeydown, true);
+
+  // Periodic scanner + DOM watchdog.
+  // ChatGPT and other SPAs can replace document.body during navigation,
+  // which detaches the shield host element. Re-mount ShieldUI if that happens.
+  scanIntervalId = setInterval(() => {
+    if (!document.getElementById('sether-shield-host')) {
+      // Host was removed — re-create the UI
+      try {
+        shieldUI = new ShieldUI();
+        shieldUI.setEnabled(globalEnabled);
+      } catch { /* ignore */ }
+    }
+    refresh();
+  }, 2000);
+
+  // F3: AI Response Guard — only relevant on AI chat UIs
+  initResponseGuard();
+
+  refresh();
+}
+
+/** Stand the shield down on this origin. Idempotent. */
+function deactivate(): void {
+  if (!activated) return;
+  teardown();
+}
+
+/** Re-read the allowlist and activate/deactivate to match. Called whenever the
+ *  user edits their sites from the popup, so the change lands on the open tab
+ *  without forcing a reload (which would destroy an in-progress prompt). */
+async function syncSiteState(): Promise<void> {
+  try {
+    siteEnabled = await isSiteEnabled(location.origin);
+    if (siteEnabled) activate();
+    else deactivate();
+  } catch { /* ignore */ }
+}
+
+/** Listeners registered on every origin, allowlisted or not.
+ *
+ *  These are the one exception to "nothing runs off-allowlist": they attach to
+ *  chrome.* (not to the page) and read nothing from it. They exist so that
+ *  "Add current site" in the popup can activate this tab in place. */
+function registerRuntimeListeners(): void {
+  try {
+    chrome.storage?.onChanged.addListener((changes) => {
+      if (changes.settings) {
+        globalEnabled = changes.settings.newValue?.enabled ?? true;
+        autoRedactEnabled = changes.settings.newValue?.autoRedact ?? false;
+        aliasMode = changes.settings.newValue?.aliasMode ?? false;
+        if (!autoRedactEnabled && autoRedactTimeoutId) {
+          clearTimeout(autoRedactTimeoutId);
+          autoRedactTimeoutId = undefined;
+        }
+        shieldUI?.setEnabled(globalEnabled);
+        loadTranslations().then(() => refresh());
+      }
+      if (changes.siteSettings) void syncSiteState();
+      if (changes.customRules) {
+        // Reload custom rules into detector when changed from popup
+        getCustomRules().then((rules) => applyCustomRules(rules));
+      }
+    });
+  } catch { /* ignore */ }
+
+  try {
+    chrome.runtime?.onMessage.addListener((message, _sender, sendResponse) => {
+      if (message.action === 'triggerScan') {
+        // Off-allowlist there is nothing to scan; say so rather than lie.
+        if (!activated) {
+          sendResponse({ ok: false, reason: 'site-not-enabled' });
+          return true;
+        }
+        refresh();
+        shieldUI?.openPanel();
+        sendResponse({ ok: true });
+      } else if (message.action === 'getStatus') {
+        sendResponse({
+          matchCount: currentMatches.filter((m) => !dismissedKeys.has(matchKey(m))).length,
+          enabled: globalEnabled,
+          siteEnabled,
+        });
+      } else if (message.action === 'reloadRules') {
+        // Rules changed from popup — reload into detector
+        getCustomRules().then((rules) => applyCustomRules(rules));
+        sendResponse({ ok: true });
+      } else if (message.action === 'reloadSites') {
+        void syncSiteState().then(() => sendResponse({ ok: true }));
+      }
+      return true;
+    });
+  } catch { /* ignore */ }
+}
+
 async function boot(): Promise<void> {
   try {
-    injectGlobalStyles();
     await loadTranslations();
     siteEnabled = await isSiteEnabled(location.origin);
 
@@ -1143,119 +1621,17 @@ async function boot(): Promise<void> {
         (v?.settings as { enabled?: boolean } | undefined)?.enabled ?? true;
       autoRedactEnabled =
         (v?.settings as { autoRedact?: boolean } | undefined)?.autoRedact ?? false;
+      aliasMode =
+        (v?.settings as { aliasMode?: boolean } | undefined)?.aliasMode ?? false;
     } catch {
       /* storage unavailable — run with defaults */
     }
 
-    shieldUI = new ShieldUI();
-    shieldUI.setEnabled(globalEnabled);
+    // Register before the allowlist gate, so an off-allowlist tab can still be
+    // switched on from the popup without a reload.
+    registerRuntimeListeners();
 
-    if (!siteEnabled) {
-      shieldUI.hide();
-      return;
-    }
-
-    // F1: Paste tracking (capture-phase, fires before input event)
-    onPasteHandler = (e: ClipboardEvent) => onPaste(e);
-    document.addEventListener('paste', onPasteHandler, true);
-
-    // Auto-detect typed content
-    onInputDebounced = debounce(onInput, 250);
-    onInputRaw = () => {
-      if (autoRedactTimeoutId) {
-        clearTimeout(autoRedactTimeoutId);
-        autoRedactTimeoutId = undefined;
-      }
-      onInputDebounced?.();
-    };
-    onFocusInDebounced = debounce(onFocusIn, 100);
-
-    document.addEventListener('input', onInputRaw, true);
-    document.addEventListener('focusin', onFocusInDebounced, true);
-    document.addEventListener('keydown', onKeydown, true);
-
-    // Periodic scanner + DOM watchdog.
-    // ChatGPT and other SPAs can replace document.body during navigation,
-    // which detaches the shield host element. Re-mount ShieldUI if that happens.
-    scanIntervalId = setInterval(() => {
-      if (!document.getElementById('sether-shield-host')) {
-        // Host was removed — re-create the UI
-        try {
-          shieldUI = new ShieldUI();
-          shieldUI.setEnabled(globalEnabled);
-          if (!siteEnabled) shieldUI.hide();
-        } catch { /* ignore */ }
-      }
-      refresh();
-    }, 2000);
-
-    // F3: AI Response Guard — only relevant on AI chat UIs
-    initResponseGuard();
-
-    // Settings changes listener
-    try {
-      chrome.storage?.onChanged.addListener((changes) => {
-        if (changes.settings) {
-          globalEnabled = changes.settings.newValue?.enabled ?? true;
-          autoRedactEnabled = changes.settings.newValue?.autoRedact ?? false;
-          if (!autoRedactEnabled && autoRedactTimeoutId) {
-            clearTimeout(autoRedactTimeoutId);
-            autoRedactTimeoutId = undefined;
-          }
-          shieldUI.setEnabled(globalEnabled);
-          loadTranslations().then(() => refresh());
-        }
-        if (changes.siteSettings) {
-          isSiteEnabled(location.origin).then((enabled) => {
-            siteEnabled = enabled;
-            if (!enabled) {
-              shieldUI.hide();
-            } else {
-              shieldUI.show();
-              refresh();
-            }
-          });
-        }
-        if (changes.customRules) {
-          // Reload custom rules into detector when changed from popup
-          getCustomRules().then((rules) => applyCustomRules(rules));
-        }
-      });
-    } catch { /* ignore */ }
-
-    // Message handler from background
-    try {
-      chrome.runtime?.onMessage.addListener((message, _sender, sendResponse) => {
-        if (message.action === 'triggerScan') {
-          refresh();
-          shieldUI.openPanel();
-          sendResponse({ ok: true });
-        } else if (message.action === 'getStatus') {
-          sendResponse({
-            matchCount: currentMatches.filter((m) => !dismissedKeys.has(matchKey(m))).length,
-            enabled: globalEnabled,
-            siteEnabled,
-          });
-        } else if (message.action === 'reloadRules') {
-          // Rules changed from popup — reload into detector
-          getCustomRules().then((rules) => applyCustomRules(rules));
-          sendResponse({ ok: true });
-        } else if (message.action === 'reloadSites') {
-          // Allowed sites changed — re-check this page
-          isSiteEnabled(location.origin).then((enabled) => {
-            siteEnabled = enabled;
-            if (!enabled) {
-              shieldUI.hide();
-            } else {
-              shieldUI.show();
-              refresh();
-            }
-          });
-          sendResponse({ ok: true });
-        }
-        return true;
-      });
-    } catch { /* ignore */ }
+    if (siteEnabled) activate();
   } catch {
     /* never throw into the host page */
   }
@@ -1321,6 +1697,32 @@ const SHIELD_CSS = `
   /* F1: Paste source badge */
   .src-badge { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 4px; }
   .src-badge.paste { background: #fef3c7; color: #92400e; }
+  .src-badge.decoy { background: #ede9fe; color: #6d28d9; }
+
+  /* Mode toggle (mask <-> decoy) */
+  .mode { display: flex; gap: 4px; background: #f3f4f6; border-radius: 8px; padding: 3px; margin-bottom: 10px; }
+  .mode-btn { flex: 1; height: 26px; border: none; border-radius: 6px; background: transparent; color: #6b7280; font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color .15s, color .15s; }
+  .mode-btn.active { background: #ffffff; color: #ea580c; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .mode-btn:hover:not(.active) { color: #374151; }
+
+  /* Decoy suggestion chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; align-items: center; }
+  .chips-label { flex-basis: 100%; font-size: 10px; font-weight: 700; color: #6d28d9; text-transform: uppercase; letter-spacing: .05em; }
+  .chip { border: 1px solid #ddd6fe; background: #f5f3ff; color: #5b21b6; font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 3px 8px; border-radius: 999px; cursor: pointer; transition: background-color .15s; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip:hover { background: #6d28d9; border-color: #6d28d9; color: #fff; }
+  .chip-more { background: #f3f4f6; border-color: #e5e7eb; color: #6b7280; font-family: inherit; }
+  .chip-more:hover { background: #6b7280; border-color: #6b7280; }
+  .match-suggest { background: #ede9fe; color: #6d28d9; }
+  .match-suggest:hover { background: #6d28d9; color: #fff; }
+  .decoy-dot { background: #6d28d9; }
+
+  /* Restore + copy-restored buttons */
+  .restore, .rg-copy-restored {
+    width: 100%; height: 32px; border: 1px solid #e5e7eb; border-radius: 10px;
+    background: #ffffff; color: #374151; font-weight: 600; font-size: 12px;
+    cursor: pointer; transition: background-color .15s; margin-top: 8px;
+  }
+  .restore:hover, .rg-copy-restored:hover { background: #f9fafb; border-color: #d1d5db; }
   
   .match-actions { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
   .match-actions button {

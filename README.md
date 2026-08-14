@@ -13,12 +13,22 @@ viral, useful, honest demo of the core idea that drives B2B inbound.
 This is the **Grammarly pattern**, not a network proxy:
 
 - A content script watches the prompt box on the supported sites.
-- It detects PII **locally** (emails, phones, cards w/ Luhn, SSNs, IBANs, IPs, and
-  API keys — OpenAI / AWS / GitHub / Slack / Stripe) as you type.
-- A floating shield shows a live count; one click **scrubs** the PII into
-  placeholders (`[email-1]`, `[card-1]`, …) before you send.
-- Changed your mind? **Restore original** puts the real values back in one tap.
-  The originals stay in this tab's memory only, never on disk.
+- It detects PII **locally** (emails, phones — national formats included via
+  multi-region libphonenumber — names, cards w/ Luhn, SSNs, IBANs, IPs,
+  addresses, dates of birth, passwords, and API keys — OpenAI / AWS / GitHub /
+  Slack / Stripe / prose-labelled) as you type.
+- A floating shield shows a live count; one click **scrubs** the PII — either
+  into masks (`e***@g***.com`) or, in **Decoy mode** (0.4.0), into realistic
+  fakes: names become John Doe-style names, phones become officially-fictional
+  numbers, emails move to example.com. The 🎭 button on each detection offers
+  suggestion chips so you pick the decoy you like; the same value always gets
+  the same decoy within a session.
+- Changed your mind? **Restore originals** puts the real values back in one
+  tap — even after you've edited around them. The vault mapping decoys to real
+  values stays in this tab's memory only, never on disk.
+- When the AI **echoes your decoy back** in its reply, the Response Guard
+  offers **Copy reply with real values** — your clipboard gets the restored
+  text; the page itself never sees it.
 - A non-blocking nudge appears if you hit send with PII still present.
 
 **What it deliberately does NOT do:**

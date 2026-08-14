@@ -1,4 +1,8 @@
 import * as esbuild from 'esbuild';
+import { execFileSync } from 'node:child_process';
+
+// Regenerate src/locales.ts from _locales/ before bundling. Throws on key drift.
+execFileSync(process.execPath, ['gen-locales.mjs'], { stdio: 'inherit' });
 
 const common = {
   bundle: true,

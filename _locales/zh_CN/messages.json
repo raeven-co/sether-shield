@@ -65,7 +65,9 @@
   "headsUp": {
     "message": "注意 — 您的提示中仍有 $COUNT$ 个敏感项。",
     "placeholders": {
-      "COUNT": { "content": "$1" }
+      "COUNT": {
+        "content": "$1"
+      }
     }
   },
   "localPrivacy": {
@@ -79,5 +81,53 @@
   },
   "footerPartOf": {
     "message": "属于"
+  },
+  "autoRedactLabel": {
+    "message": "自动脱敏"
+  },
+  "autoRedactOn": {
+    "message": "自动脱敏已开启"
+  },
+  "autoRedactOff": {
+    "message": "自动脱敏已关闭"
+  },
+  "maskMode": {
+    "message": "遮蔽"
+  },
+  "decoyMode": {
+    "message": "诱饵"
+  },
+  "decoyAll": {
+    "message": "全部替换为诱饵"
+  },
+  "restoreOriginals": {
+    "message": "恢复原始值"
+  },
+  "pickDecoy": {
+    "message": "选择诱饵"
+  },
+  "useDecoy": {
+    "message": "使用此诱饵"
+  },
+  "moreDecoys": {
+    "message": "更多"
+  },
+  "decoysInReply": {
+    "message": "您的诱饵出现在此回复中"
+  },
+  "copyRealValues": {
+    "message": "复制含真实值的回复"
+  },
+  "copiedRealValues": {
+    "message": "已复制真实值"
+  },
+  "copyFailed": {
+    "message": "复制失败"
+  },
+  "responseGuardIntro": {
+    "message": "复制前请检查此 AI 回复。"
+  },
+  "decoyModeLabel": {
+    "message": "诱饵模式"
   }
 }

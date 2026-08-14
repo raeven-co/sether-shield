@@ -35,24 +35,35 @@ jobs:
         run: npm run build
 
       - name: Verify build output exists
-        run: test -f dist/content.js && test -f dist/popup.js
+        run: test -f dist/content.js && test -f dist/popup.js && test -f dist/background.js
+
+      - name: Guard — locales in sync
+        # gen-locales.mjs throws on key drift, so a rebuild that leaves the tree
+        # dirty means someone hand-edited the generated src/locales.ts.
+        run: |
+          if ! git diff --quiet -- src/locales.ts; then
+            echo "::error::src/locales.ts is generated. Edit _locales/<lang>/messages.json and run npm run build."
+            git diff --stat -- src/locales.ts
+            exit 1
+          fi
+          echo "OK — locales in sync."
 
       - name: Guard — no network calls in shipped bundles
         # Sether Shield is "100% local". Fail the build if a fetch/XHR/WebSocket
-        # or remote-host reference ever sneaks into the shipped content script.
+        # or remote-host reference ever sneaks into a shipped bundle.
         run: |
-          if grep -nE "fetch\(|XMLHttpRequest|WebSocket|navigator\.sendBeacon|new Image\(" dist/content.js dist/popup.js; then
+          if grep -nE "fetch\(|XMLHttpRequest|WebSocket|navigator\.sendBeacon|new Image\(" \
+              dist/content.js dist/popup.js dist/background.js; then
             echo "::error::Network-capable call found in shipped bundle — Sether Shield must stay 100% local."
             exit 1
           fi
           echo "OK — no network calls in dist."
 
       - name: Package extension zip
-        run: |
-          VERSION=$(node -p "require('./manifest.json').version")
-          mkdir -p out
-          zip -r "out/sether-shield-v${VERSION}.zip" manifest.json dist icons popup.html
-          echo "Packaged out/sether-shield-v${VERSION}.zip"
+        # Single source of truth for the file list — derived from manifest.json.
+        # Do NOT hand-roll `zip -r ...` here again: that is how _locales/ got
+        # dropped and shipped a package that would not load.
+        run: npm run package
 
       - name: Upload zip artifact
         uses: actions/upload-artifact@v4
@@ -61,13 +72,46 @@ jobs:
           path: out/*.zip
           if-no-files-found: error
 
+  e2e:
+    name: e2e · real Chrome · packaged artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install (locked)
+        run: npm ci
+
+      - name: Install Chrome for Testing
+        # Branded Chrome refuses --disable-extensions-except, so extension e2e
+        # requires Chrome for Testing specifically.
+        run: npx --yes @puppeteer/browsers install chrome@stable --path "$HOME/.cache/puppeteer"
+
+      - name: Package
+        run: npm run package
+
+      - name: Unpack the artifact we would actually ship
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          mkdir -p out/unpacked
+          unzip -q "out/sether-shield-v${VERSION}.zip" -d out/unpacked
+
+      - name: E2E against the packaged artifact
+        # Runs against the unzipped store package, not the working tree, so a
+        # missing file in the zip fails here rather than in store review.
+        run: EXT_PATH=out/unpacked npm run test:e2e
+
   # Manual, secret-gated publish to the Chrome Web Store.
   # NEVER runs automatically — trigger from the Actions tab ("Run workflow")
   # only when you intend to ship a reviewed build to your users.
   # Requires repo secrets: CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN.
   publish:
     name: publish to Chrome Web Store (manual)
-    needs: build
+    needs: [build, e2e]
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: chrome-web-store
@@ -78,11 +122,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run build
       - name: Package
-        run: |
-          VERSION=$(node -p "require('./manifest.json').version")
-          zip -r "sether-shield.zip" manifest.json dist icons popup.html
+        run: npm run package
       - name: Upload & submit (chrome-webstore-upload-cli)
         env:
           CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
@@ -90,10 +131,11 @@ jobs:
           CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
           CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
         run: |
+          VERSION=$(node -p "require('./manifest.json').version")
           npx -y chrome-webstore-upload-cli@3 upload \
-            --source sether-shield.zip \
+            --source "out/sether-shield-v${VERSION}.zip" \
             --extension-id "$CWS_EXTENSION_ID" \
             --client-id "$CWS_CLIENT_ID" \
             --client-secret "$CWS_CLIENT_SECRET" \
             --refresh-token "$CWS_REFRESH_TOKEN"
-          echo "Uploaded to CWS as a draft. Review and hit Publish in the dashboard (or add --auto-publish when you trust the pipeline)."
+          echo "Uploaded to CWS as a draft. Review and hit Publish in the dashboard."

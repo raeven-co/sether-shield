@@ -20,6 +20,7 @@ import {
   basicDetectors,
   secretsDetectors,
   identityDetectors,
+  createMultiRegionPhoneDetector,
   type Detector,
 } from '@raeven-co/sether/browser';
 
@@ -53,6 +54,14 @@ const FRIENDLY: Record<string, string> = {
   DB_URI: 'database URI',
   CREDENTIAL: 'credential',
   PRIVATE_KEY: 'private key',
+  API_KEY: 'API key',
+  PASSWORD: 'password',
+  AWS_KEY: 'AWS key',
+  OPENAI_KEY: 'API key',
+  ANTHROPIC_KEY: 'API key',
+  GITHUB_PAT: 'GitHub token',
+  SLACK_TOKEN: 'Slack token',
+  STRIPE_KEY: 'Stripe key',
   CUSTOM: 'custom',
 };
 
@@ -82,26 +91,95 @@ const NAME_STOPWORDS = new Set([
   'Confused', 'Curious', 'Interested', 'Wondering', 'Asking', 'Building', 'Using',
 ]);
 
+// Strong anchors ("my name is", "call me", "name's") introduce a name so
+// unambiguously that we also accept LOWERCASE names after them — users type
+// "my name is godfrey lebo" without the shift key all the time. Trailing
+// sentence-continuation words are trimmed via the common-word list below.
+const STRONG_NAME_ANCHOR =
+  /(?:[Mm]y name is|[Cc]all me|[Nn]ame's)\s+([\p{L}][\p{L}''-]+(?:\s+[\p{L}][\p{L}''-]+){0,2})/gu;
+
+// Words that continue the sentence rather than the name. Checked lowercase.
+const NAME_CONTINUATIONS = new Set([
+  'and', 'but', 'so', 'not', 'the', 'a', 'an', 'i', 'im', 'is', 'was', 'am',
+  'by', 'on', 'in', 'at', 'to', 'of', 'or', 'if', 'as', 'it', 'me', 'my',
+  'also', 'actually', 'really', 'just', 'still', 'now', 'here', 'there',
+  'though', 'although', 'because', 'since', 'when', 'while', 'which', 'that',
+  'this', 'these', 'those', 'what', 'who', 'how', 'why', 'where',
+  'spelled', 'spelt', 'pronounced', 'written', 'btw', 'ok', 'okay', 'right',
+]);
+
 const conversationalName: Detector = {
   type: 'NAME',
   detect(text: string) {
     const out: { start: number; end: number; value: string }[] = [];
+    const seen = new Set<string>();
     for (const m of text.matchAll(NAME_ANCHOR)) {
       const name = m[1];
       if (!name || m.index == null) continue;
       const firstWord = name.split(/\s+/)[0] ?? '';
       if (NAME_STOPWORDS.has(firstWord)) continue;
       const start = m.index + m[0].length - name.length;
+      seen.add(`${start}`);
+      out.push({ start, end: start + name.length, value: name });
+    }
+    // Lowercase-tolerant pass, strong anchors only.
+    for (const m of text.matchAll(STRONG_NAME_ANCHOR)) {
+      const captured = m[1];
+      if (!captured || m.index == null) continue;
+      // Trim trailing sentence-continuation words ("godfrey lebo and" → "godfrey lebo").
+      const words = captured.split(/\s+/);
+      while (words.length > 0 && NAME_CONTINUATIONS.has(words[words.length - 1]!.toLowerCase())) {
+        words.pop();
+      }
+      if (words.length === 0) continue;
+      const first = words[0]!;
+      if (NAME_CONTINUATIONS.has(first.toLowerCase()) || NAME_STOPWORDS.has(first)) continue;
+      const name = words.join(' ');
+      if (name.length < 2) continue;
+      const start = m.index + m[0].length - captured.length;
+      if (seen.has(`${start}`)) continue; // capitalised pass already got it
       out.push({ start, end: start + name.length, value: name });
     }
     return out;
   },
 };
 
+// ── Multi-region phone detection ──────────────────────────────────────────────
+// The default core PHONE detector only recognises numbers with an explicit
+// country code (+234…). Real prompts carry national formats — "08065786535",
+// "(415) 555-2671" — so we run libphonenumber for the browser locales' regions
+// plus a default set covering the shield's main user base.
+
+// Conservative default set — the user's own region(s) join via
+// navigator.languages below. IN is deliberately NOT a default: its metadata
+// validates bare 9-digit strings ("patient ref 123456789"), which floods
+// prompts with false phone matches.
+const DEFAULT_PHONE_REGIONS = ['US', 'GB', 'NG', 'CA'] as const;
+
+function phoneRegions(): string[] {
+  const regions = new Set<string>(DEFAULT_PHONE_REGIONS);
+  try {
+    const langs = typeof navigator !== 'undefined' ? navigator.languages ?? [] : [];
+    for (const lang of langs) {
+      const region = lang.split('-')[1];
+      if (region && /^[A-Za-z]{2}$/.test(region)) regions.add(region.toUpperCase());
+    }
+  } catch {
+    /* navigator unavailable (tests) — defaults suffice */
+  }
+  return [...regions].slice(0, 8);
+}
+
+const multiRegionPhone = createMultiRegionPhoneDetector(
+  phoneRegions() as Parameters<typeof createMultiRegionPhoneDetector>[0],
+);
+
 // ── Composite detector list ───────────────────────────────────────────────────
+// The core PHONE detector is swapped for the multi-region one above.
 
 const DETECTORS: readonly Detector[] = [
-  ...basicDetectors,
+  ...basicDetectors.filter((d) => d.type !== 'PHONE'),
+  multiRegionPhone,
   ...secretsDetectors,
   ...identityDetectors,
   conversationalName,
@@ -319,6 +397,16 @@ export function maskValue(value: string, type: string): string {
     }
     case 'PRIVATE_KEY':
       return '-----BEGIN PRIVATE KEY----- [REDACTED]';
+    case 'API_KEY':
+    case 'AWS_KEY':
+    case 'OPENAI_KEY':
+    case 'ANTHROPIC_KEY':
+    case 'GITHUB_PAT':
+    case 'SLACK_TOKEN':
+    case 'STRIPE_KEY':
+      return value.length > 10 ? value.slice(0, 7) + '***' : '***';
+    case 'PASSWORD':
+      return '********';
     default:
       if (value.length <= 4) return '***';
       return value.slice(0, 2) + '***' + value.slice(-1);

@@ -44,6 +44,12 @@ export interface Settings {
   enabled: boolean;
   language?: string;
   autoRedact?: boolean;
+  /**
+   * Replacement strategy. false/undefined = mask ("e***@g***.com");
+   * true = decoy mode — realistic fake values (John Doe, fictional phones)
+   * that read naturally to the LLM and can be restored from the session vault.
+   */
+  aliasMode?: boolean;
 }
 
 /** Session statistics — aggregate counts only, no PII. */

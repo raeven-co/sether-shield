@@ -65,7 +65,9 @@
   "headsUp": {
     "message": "Achtung — Ihr Prompt enthält noch $COUNT$ sensible(s) Element(e).",
     "placeholders": {
-      "COUNT": { "content": "$1" }
+      "COUNT": {
+        "content": "$1"
+      }
     }
   },
   "localPrivacy": {
@@ -79,5 +81,53 @@
   },
   "footerPartOf": {
     "message": "Teil von"
+  },
+  "autoRedactLabel": {
+    "message": "Automatisches Schwärzen"
+  },
+  "autoRedactOn": {
+    "message": "Automatisches Schwärzen ein"
+  },
+  "autoRedactOff": {
+    "message": "Automatisches Schwärzen aus"
+  },
+  "maskMode": {
+    "message": "Maskieren"
+  },
+  "decoyMode": {
+    "message": "Köder"
+  },
+  "decoyAll": {
+    "message": "Alles durch Köder ersetzen"
+  },
+  "restoreOriginals": {
+    "message": "Originale wiederherstellen"
+  },
+  "pickDecoy": {
+    "message": "Köder auswählen"
+  },
+  "useDecoy": {
+    "message": "Diesen Köder verwenden"
+  },
+  "moreDecoys": {
+    "message": "Mehr"
+  },
+  "decoysInReply": {
+    "message": "Ihre Köder erscheinen in dieser Antwort"
+  },
+  "copyRealValues": {
+    "message": "Antwort mit echten Werten kopieren"
+  },
+  "copiedRealValues": {
+    "message": "Mit echten Werten kopiert"
+  },
+  "copyFailed": {
+    "message": "Kopieren fehlgeschlagen"
+  },
+  "responseGuardIntro": {
+    "message": "Prüfen Sie diese KI-Antwort, bevor Sie sie kopieren."
+  },
+  "decoyModeLabel": {
+    "message": "Köder-Modus"
   }
 }

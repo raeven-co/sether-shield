@@ -70,6 +70,8 @@ const toggle = $<HTMLInputElement>('toggle');
 const stateEl = $('state');
 const autoRedactToggle = $<HTMLInputElement>('autoRedactToggle');
 const autoRedactState = $('autoRedactState');
+const decoyModeToggle = $<HTMLInputElement>('decoyModeToggle');
+const decoyModeState = $('decoyModeState');
 const langSelect = $<HTMLSelectElement>('langSelect');
 const selectedLangName = $('selectedLangName');
 const scrubbedEl = $('scrubbed');
@@ -80,6 +82,7 @@ const clearHistoryBtn = $('clearHistory');
 const lblProtection = $('lblProtection');
 const lblLanguage = $('lblLanguage');
 const lblAutoRedact = $('lblAutoRedact');
+const lblDecoyMode = $('lblDecoyMode');
 const lblScrubbedCap = $('lblScrubbedCap');
 const lblCaughtCap = $('lblCaughtCap');
 const lblHistory = $('lblHistory');
@@ -150,6 +153,12 @@ function applyAutoRedact(enabled: boolean): void {
   autoRedactState.className = enabled ? 'state state-active' : 'state state-inactive';
 }
 
+function applyDecoyMode(enabled: boolean): void {
+  decoyModeToggle.checked = enabled;
+  decoyModeState.textContent = enabled ? translate('enabled') : translate('disabled');
+  decoyModeState.className = enabled ? 'state state-active' : 'state state-inactive';
+}
+
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
@@ -164,6 +173,7 @@ function renderLabels(): void {
   lblProtection.textContent = translate('protectionLabel');
   lblLanguage.textContent = LANG_LABELS[langSelect.value] || 'Language';
   lblAutoRedact.textContent = translate('autoRedactLabel');
+  lblDecoyMode.textContent = translate('decoyModeLabel');
   lblScrubbedCap.textContent = translate('promptsScrubbed');
   lblCaughtCap.textContent = translate('piiCaught');
   lblHistory.textContent = translate('redactionHistory');
@@ -174,6 +184,7 @@ function renderLabels(): void {
   selectedLangName.textContent = LANG_NAMES[langSelect.value] || 'English';
   applyEnabled(toggle.checked);
   applyAutoRedact(autoRedactToggle.checked);
+  applyDecoyMode(decoyModeToggle.checked);
 }
 
 // ── History ───────────────────────────────────────────────────────────────────
@@ -183,7 +194,7 @@ async function renderHistory(): Promise<void> {
   historyList.innerHTML = '';
 
   if (history.length === 0) {
-    historyEmpty.textContent = translate('noHistory') !== 'noHistory' ? translate('noHistory') : 'No redactions yet.';
+    historyEmpty.textContent = translate('noHistory');
     historyEmpty.style.display = 'block';
     historyList.appendChild(historyEmpty);
     clearHistoryBtn.style.display = 'none';
@@ -604,6 +615,7 @@ async function init(): Promise<void> {
   scrubbedEl.textContent = String(stats.promptsScrubbed);
   caughtEl.textContent = String(stats.piiCaught);
   applyAutoRedact(!!settings.autoRedact);
+  applyDecoyMode(!!settings.aliasMode);
 
   // Parallel renders
   await Promise.all([renderRules(), renderHistory(), renderSites()]);
@@ -622,6 +634,13 @@ autoRedactToggle.addEventListener('change', async () => {
   const settings = await getSettings();
   settings.autoRedact = autoRedactToggle.checked;
   applyAutoRedact(autoRedactToggle.checked);
+  await setSettings(settings);
+});
+
+decoyModeToggle.addEventListener('change', async () => {
+  const settings = await getSettings();
+  settings.aliasMode = decoyModeToggle.checked;
+  applyDecoyMode(decoyModeToggle.checked);
   await setSettings(settings);
 });
 

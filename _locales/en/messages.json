@@ -65,7 +65,9 @@
   "headsUp": {
     "message": "Heads up — your prompt still has $COUNT$ sensitive item(s).",
     "placeholders": {
-      "COUNT": { "content": "$1" }
+      "COUNT": {
+        "content": "$1"
+      }
     }
   },
   "localPrivacy": {
@@ -88,5 +90,44 @@
   },
   "autoRedactOff": {
     "message": "Disabled"
+  },
+  "maskMode": {
+    "message": "Mask"
+  },
+  "decoyMode": {
+    "message": "Decoy"
+  },
+  "decoyAll": {
+    "message": "Swap all for decoys"
+  },
+  "restoreOriginals": {
+    "message": "Restore originals"
+  },
+  "pickDecoy": {
+    "message": "Pick a decoy"
+  },
+  "useDecoy": {
+    "message": "Use this decoy"
+  },
+  "moreDecoys": {
+    "message": "More"
+  },
+  "decoysInReply": {
+    "message": "Your decoys appeared in this reply"
+  },
+  "copyRealValues": {
+    "message": "Copy reply with real values"
+  },
+  "copiedRealValues": {
+    "message": "Copied with real values"
+  },
+  "copyFailed": {
+    "message": "Copy failed"
+  },
+  "responseGuardIntro": {
+    "message": "Review this AI reply before copying it anywhere."
+  },
+  "decoyModeLabel": {
+    "message": "Decoy mode"
   }
 }

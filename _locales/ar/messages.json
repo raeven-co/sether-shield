@@ -65,7 +65,9 @@
   "headsUp": {
     "message": "تنبيه — مطالبتك لا تزال تحتوي على $COUNT$ عنصر(عناصر) حساسة.",
     "placeholders": {
-      "COUNT": { "content": "$1" }
+      "COUNT": {
+        "content": "$1"
+      }
     }
   },
   "localPrivacy": {
@@ -79,5 +81,53 @@
   },
   "footerPartOf": {
     "message": "جزء من"
+  },
+  "autoRedactLabel": {
+    "message": "التنقيح التلقائي"
+  },
+  "autoRedactOn": {
+    "message": "التنقيح التلقائي مُفعّل"
+  },
+  "autoRedactOff": {
+    "message": "التنقيح التلقائي مُعطّل"
+  },
+  "maskMode": {
+    "message": "إخفاء"
+  },
+  "decoyMode": {
+    "message": "تمويه"
+  },
+  "decoyAll": {
+    "message": "استبدال الكل ببيانات تمويهية"
+  },
+  "restoreOriginals": {
+    "message": "استعادة القيم الأصلية"
+  },
+  "pickDecoy": {
+    "message": "اختر قيمة تمويهية"
+  },
+  "useDecoy": {
+    "message": "استخدم هذه القيمة"
+  },
+  "moreDecoys": {
+    "message": "المزيد"
+  },
+  "decoysInReply": {
+    "message": "ظهرت بياناتك التمويهية في هذا الرد"
+  },
+  "copyRealValues": {
+    "message": "نسخ الرد بالقيم الحقيقية"
+  },
+  "copiedRealValues": {
+    "message": "تم النسخ بالقيم الحقيقية"
+  },
+  "copyFailed": {
+    "message": "فشل النسخ"
+  },
+  "responseGuardIntro": {
+    "message": "راجع رد الذكاء الاصطناعي قبل نسخه."
+  },
+  "decoyModeLabel": {
+    "message": "وضع التمويه"
   }
 }
