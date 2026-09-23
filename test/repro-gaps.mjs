@@ -23,12 +23,12 @@ const cases = [
   ['i am name', "i am Sarah Connor and I need help with my resume"],
   ['name lowercase anchor', 'my name is godfrey lebo'],
   // phone numbers, various formats
-  ['phone NG national', 'call me on 08065786535'],
-  ['phone NG spaced', 'my number is 0806 578 6535'],
+  ['phone NG national', 'call me on 08012345678'],
+  ['phone NG spaced', 'my number is 0801 234 5678'],
   ['phone US national', 'call me at (415) 555-2671'],
   ['phone US dashed', 'my number is 415-555-2671'],
-  ['phone intl', 'reach me on +2348065786535'],
-  ['phone labelled', 'Phone: 08065786535'],
+  ['phone intl', 'reach me on +2348012345678'],
+  ['phone labelled', 'Phone: 08012345678'],
   // API keys / secrets
   ['openai key', 'my api key is sk-proj-Ab3dEf6hIj9kLm2nOp5qRs8tUv1wXy4z'],
   ['generic api key label', 'my API key is 9f8e7d6c5b4a39281706f5e4d3c2b1a0'],

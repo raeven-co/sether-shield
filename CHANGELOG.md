@@ -71,11 +71,11 @@ to your real values lives in tab memory only and never touches disk.
 
 ### Fixed — the detection gaps
 
-"My name is Godfrey, my number is 0806 578 6535, my api key is …" used to
+"My name is Godfrey, my number is 0801 234 5678, my api key is …" used to
 sail through with only the email caught. Now:
 
 - **National-format phone numbers** are detected (multi-region libphonenumber:
-  US/GB/NG/CA defaults + your browser locale's regions). `08065786535`,
+  US/GB/NG/CA defaults + your browser locale's regions). `08012345678`,
   `(415) 555-2671`, `415-555-2671` all catch; `+…` international still works.
 - **Prose-labelled API keys and passwords** — `my api key is AbC123…`,
   `password: hunter2butlonger` — via the core's new label-anchored detectors.

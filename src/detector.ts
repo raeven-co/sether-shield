@@ -148,7 +148,7 @@ const conversationalName: Detector = {
 
 // ── Multi-region phone detection ──────────────────────────────────────────────
 // The default core PHONE detector only recognises numbers with an explicit
-// country code (+234…). Real prompts carry national formats — "08065786535",
+// country code (+234…). Real prompts carry national formats — "08012345678",
 // "(415) 555-2671" — so we run libphonenumber for the browser locales' regions
 // plus a default set covering the shield's main user base.
 

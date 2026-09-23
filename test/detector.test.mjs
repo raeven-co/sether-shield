@@ -37,7 +37,7 @@ check('detects phone (formatted)', found.some((m) => m.type === 'PHONE'));
 check('detects card', vals.some((v) => v.replace(/\s/g, '') === '4242424242424242'));
 check('detects SSN', vals.includes('123-45-6789'));
 check('detects AWS key', vals.includes('AKIAIOSFODNN7EXAMPLE'));
-check('detects continuous intl phone (+234…)', detect('reach me on +2348065786535 anytime').some((m) => m.type === 'PHONE'));
+check('detects continuous intl phone (+234…)', detect('reach me on +2348012345678 anytime').some((m) => m.type === 'PHONE'));
 check('detects labelled name', detect('Name: John Doe').some((m) => m.type === 'NAME'));
 check('detects conversational name', detect('hey, my name is Emori and I build things').some((m) => m.type === 'NAME' && m.value === 'Emori'));
 check('no conversational-name false positive', !detect('I am going to the market on tuesday').some((m) => m.type === 'NAME'));

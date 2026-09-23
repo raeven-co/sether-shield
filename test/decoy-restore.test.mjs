@@ -39,11 +39,11 @@ const check = (name, cond) => {
 // ── 1. Detection-gap regressions ──────────────────────────────────────────────
 
 const gapCases = [
-  ['NG national phone', 'call me on 08065786535', 'PHONE'],
-  ['NG spaced phone', 'my number is 0806 578 6535', 'PHONE'],
+  ['NG national phone', 'call me on 08012345678', 'PHONE'],
+  ['NG spaced phone', 'my number is 0801 234 5678', 'PHONE'],
   ['US national phone', 'call me at (415) 555-2671', 'PHONE'],
   ['US dashed phone', 'my number is 415-555-2671', 'PHONE'],
-  ['labelled phone', 'Phone: 08065786535', 'PHONE'],
+  ['labelled phone', 'Phone: 08012345678', 'PHONE'],
   ['short API key', 'use apikey AbC123xYz789QwE456', 'API_KEY'],
   ['password prose', 'my password is hunter2butlonger', 'PASSWORD'],
   ['lowercase anchored name', 'my name is godfrey lebo', 'NAME'],
@@ -83,7 +83,7 @@ check(
   emailSuggestions.every((s) => /@example\.(com|org|net)$/.test(s)),
 );
 
-const phoneSuggestions = suggestAliases('PHONE', '+2348065786535', 3);
+const phoneSuggestions = suggestAliases('PHONE', '+2348012345678', 3);
 check(
   'NG phone decoys stay NG-shaped',
   phoneSuggestions.every((s) => s.startsWith('+234')),
@@ -93,7 +93,7 @@ check(
 
 const prompt =
   'My name is Godfrey Lebo, my email address is emory@gmail.com, ' +
-  'call me on 08065786535. Regards, Godfrey Lebo';
+  'call me on 08012345678. Regards, Godfrey Lebo';
 
 const vault = new AliasVault();
 const replacementLog = new Map(); // replacement → original (mirrors content.ts)
@@ -115,7 +115,7 @@ for (const [rep, orig] of replacementLog.entries()) {
 
 check('lifecycle: no real name in scrubbed prompt', !scrubbed.includes('Godfrey Lebo'));
 check('lifecycle: no real email in scrubbed prompt', !scrubbed.includes('emory@gmail.com'));
-check('lifecycle: no real phone in scrubbed prompt', !scrubbed.includes('08065786535'));
+check('lifecycle: no real phone in scrubbed prompt', !scrubbed.includes('08012345678'));
 
 const decoyName = vault.aliasOf('Godfrey Lebo');
 check('lifecycle: stable decoy reused for repeated mention',
