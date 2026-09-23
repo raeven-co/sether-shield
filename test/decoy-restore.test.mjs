@@ -158,5 +158,45 @@ if (!log2.has('G***')) log2.set('G***', 'Godfrey');
 if (!log2.has('G***')) log2.set('G***', 'Gabriel');
 check('collision: first mask mapping wins', log2.get('G***') === 'Godfrey');
 
+// ── 4. Reformatted-echo restore (v0.5.0 regression pack) ─────────────────────
+// The real content.ts restore path, tested directly: AI renderers put line
+// breaks / NBSP / markup boundaries inside multi-word decoys, which used to
+// make exact-match restore silently fail.
+
+const { containsReplacement, restoreWithPairs, flexPattern } = await load('../src/restore-utils.ts');
+
+{
+  const pairs = [['John Doe', 'Godfrey Lebo']];
+  check('reformat: line break inside decoy still restores',
+    restoreWithPairs('Dear John\nDoe, welcome back', pairs) === 'Dear Godfrey Lebo, welcome back');
+  check('reformat: NBSP inside decoy still restores',
+    restoreWithPairs('Dear John Doe,', pairs) === 'Dear Godfrey Lebo,');
+  check('reformat: multiple spaces still restore',
+    restoreWithPairs('John   Doe wrote', pairs) === 'Godfrey Lebo wrote');
+  check('reformat: exact match still works (fast path)',
+    restoreWithPairs('John Doe here', pairs) === 'Godfrey Lebo here');
+  check('reformat: detection sees reformatted echo',
+    containsReplacement('reply from John Doe today', 'John Doe'));
+  check('reformat: single-token replacement never fuzzy-matches',
+    !containsReplacement('jane.doe @example.com', 'jane.doe@example.com'));
+}
+
+{
+  // Longest-first ordering: "[redacted-12]" must be swapped before "[redacted-1]"
+  const pairs = [
+    ['[redacted-12]', 'Raeven Company'],
+    ['[redacted-1]', 'Godfrey'],
+  ];
+  const out = restoreWithPairs('Client [redacted-1] of [redacted-12].', pairs);
+  check('ordering: numbered placeholders restore without prefix clobbering',
+    out === 'Client Godfrey of Raeven Company.');
+}
+
+{
+  // Regex metacharacters in a replacement must never break the tolerant pass.
+  const re = flexPattern('sk_live_ab(c) [x]');
+  check('safety: metacharacters in replacement are escaped', re !== null && re.test('sk_live_ab(c)\n[x]'));
+}
+
 console.log(failed === 0 ? '\n✅ all decoy/restore checks passed' : `\n❌ ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

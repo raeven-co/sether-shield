@@ -929,10 +929,30 @@
         Rules automatically detect and hide sensitive info when you type or paste. Toggle rules on/off as needed.
       </p>
       <div class="scroll-list">
-        <div class="scroll-list-inner" id="rulesList" style="max-height:320px;">
+        <div class="scroll-list-inner" id="rulesList" style="max-height:220px;">
           <div class="empty-msg" id="rulesEmpty">No rules yet.</div>
         </div>
       </div>
+
+      <div class="sec-hd" style="margin:14px 0 8px;">
+        <div class="label" id="lblWatchlist">My Watchlist</div>
+        <div style="display:flex; gap:10px;">
+          <button class="sec-action" id="dlSampleBtn" style="color:var(--text-muted);">⬇ Sample file</button>
+          <button class="sec-action" id="importTermsBtn">⬆ Import file</button>
+        </div>
+      </div>
+      <p style="font-size:10px;color:var(--text-muted);margin-bottom:8px;line-height:1.5;" id="watchlistHint">
+        Download the sample, fill it with your own names, emails and IDs plus how to handle
+        each one (redact, mask or decoy), then import it. Importing replaces the current
+        watchlist. Terms are stored only on this device and never leave your browser.
+      </p>
+      <input type="file" id="termsFileIn" accept=".csv,.txt,.json" style="display:none;" />
+      <div class="scroll-list">
+        <div class="scroll-list-inner" id="termsList" style="max-height:150px;">
+          <div class="empty-msg" id="termsEmpty">No watchlist imported yet.</div>
+        </div>
+      </div>
+      <div id="termsMsg" style="font-size:10px;margin-top:6px;line-height:1.5;color:var(--text-muted);"></div>
     </div>
 
     <!-- ═══ SITES TAB ═══ -->

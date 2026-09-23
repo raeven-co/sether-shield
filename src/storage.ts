@@ -28,6 +28,7 @@ import type {
   Stats,
   CustomRule,
 } from './types.js';
+import type { CustomTerm } from './terms.js';
 import { LOCALES } from './locales.js';
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -320,6 +321,94 @@ export async function resetBuiltinRules(): Promise<void> {
 }
 
 
+
+// ── Watchlist terms (imported from a user file) ───────────────────────────────
+//
+// Deliberate exception to "never store originals": watchlist terms ARE the
+// user's own sensitive values, imported explicitly so future prompts stay
+// protected across restarts. Local-only; this extension makes zero network
+// calls. The popup states this next to the import button.
+
+export async function getCustomTerms(): Promise<CustomTerm[]> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get('customTerms', (v) => {
+      resolve((v?.customTerms as CustomTerm[] | undefined) ?? []);
+    });
+  });
+}
+
+export async function setCustomTerms(terms: CustomTerm[]): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ customTerms: terms }, () => resolve());
+  });
+}
+
+export async function deleteCustomTerm(id: string): Promise<void> {
+  const terms = await getCustomTerms();
+  await setCustomTerms(terms.filter((t) => t.id !== id));
+}
+
+export async function clearCustomTerms(): Promise<void> {
+  await setCustomTerms([]);
+}
+
+// ── Session vault persistence ─────────────────────────────────────────────────
+//
+// chrome.storage.session is held in MEMORY by the browser (never written to
+// disk) and cleared when the browser closes — the same lifetime the in-page
+// vault was meant to have, but it survives tab reloads and SPA navigations.
+// That is the fix for "restore stopped working after the page refreshed":
+// before this, the replacement→original map lived in content-script memory
+// and died with the document, stranding every decoy already sent to the AI.
+//
+// The background service worker grants content scripts access via
+// setAccessLevel('TRUSTED_AND_UNTRUSTED_CONTEXTS') — without that call this
+// area is invisible here and these helpers quietly no-op (memory-only mode).
+
+interface VaultRecord {
+  /** replacement → { original, type } for everything swapped in this session. */
+  entries: Record<string, { o: string; t: string }>;
+}
+
+const VAULT_KEY = 'sessionVault';
+const VAULT_MAX_ENTRIES = 2000;
+
+export async function loadSessionVault(): Promise<Map<string, { original: string; type: string }>> {
+  const out = new Map<string, { original: string; type: string }>();
+  try {
+    const area = chrome.storage?.session;
+    if (!area) return out;
+    const v = await area.get(VAULT_KEY);
+    const rec = v?.[VAULT_KEY] as VaultRecord | undefined;
+    if (rec?.entries) {
+      for (const [replacement, e] of Object.entries(rec.entries)) {
+        if (typeof e?.o === 'string') out.set(replacement, { original: e.o, type: e.t ?? 'DEFAULT' });
+      }
+    }
+  } catch {
+    /* session area unavailable — memory-only mode */
+  }
+  return out;
+}
+
+export async function saveSessionVault(
+  entries: ReadonlyMap<string, { original: string; type: string }>,
+): Promise<void> {
+  try {
+    const area = chrome.storage?.session;
+    if (!area) return;
+    const rec: VaultRecord = { entries: {} };
+    let n = 0;
+    for (const [replacement, e] of entries) {
+      if (n >= VAULT_MAX_ENTRIES) break;
+      rec.entries[replacement] = { o: e.original, t: e.type };
+      n++;
+    }
+    await area.set({ [VAULT_KEY]: rec });
+  } catch {
+    /* session area unavailable — memory-only mode */
+  }
+}
 
 // ── Translation Loader (dynamic i18n override) ────────────────────────────────
 

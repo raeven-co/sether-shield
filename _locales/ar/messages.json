@@ -129,5 +129,14 @@
   },
   "decoyModeLabel": {
     "message": "وضع التمويه"
+  },
+  "ctxRedact": {
+    "message": "تنقيح التحديد"
+  },
+  "ctxMask": {
+    "message": "إخفاء التحديد"
+  },
+  "ctxDecoy": {
+    "message": "استبدال بقيمة تمويهية"
   }
 }

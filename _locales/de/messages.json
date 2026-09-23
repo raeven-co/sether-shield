@@ -129,5 +129,14 @@
   },
   "decoyModeLabel": {
     "message": "Köder-Modus"
+  },
+  "ctxRedact": {
+    "message": "Auswahl schwärzen"
+  },
+  "ctxMask": {
+    "message": "Auswahl maskieren"
+  },
+  "ctxDecoy": {
+    "message": "Durch Köder ersetzen"
   }
 }

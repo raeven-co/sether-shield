@@ -129,5 +129,14 @@
   },
   "decoyModeLabel": {
     "message": "Modo isca"
+  },
+  "ctxRedact": {
+    "message": "Ocultar a seleção"
+  },
+  "ctxMask": {
+    "message": "Mascarar a seleção"
+  },
+  "ctxDecoy": {
+    "message": "Trocar por um chamariz"
   }
 }

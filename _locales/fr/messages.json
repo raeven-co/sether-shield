@@ -129,5 +129,14 @@
   },
   "decoyModeLabel": {
     "message": "Mode leurre"
+  },
+  "ctxRedact": {
+    "message": "Caviarder la sélection"
+  },
+  "ctxMask": {
+    "message": "Masquer la sélection"
+  },
+  "ctxDecoy": {
+    "message": "Remplacer par un leurre"
   }
 }

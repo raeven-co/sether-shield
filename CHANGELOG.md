@@ -1,5 +1,68 @@
 # Changelog
 
+## 0.5.0 — 2026-08-14
+
+Right-click protection, the watchlist file, and the restore overhaul from the
+field report ("restore doesn't work when the answer comes back"). Still 100%
+local; still zero network calls.
+
+### Fixed — restore now survives the real world
+
+The reply to a scrubbed prompt usually arrives long after the scrub — often
+after a page refresh. Restore used to die with the page:
+
+- **The restore vault now survives reloads and SPA navigations.** It is
+  mirrored into `chrome.storage.session`, which Chrome holds in memory only —
+  never written to disk, wiped when the browser closes. Scrub, refresh, get
+  the reply, restore: works.
+- **Reformatted decoys still restore.** AI renderers put line breaks,
+  non-breaking spaces, and markup boundaries inside multi-word decoys
+  ("John\nDoe"); exact-match restore silently failed on those. Matching and
+  restore are now whitespace-tolerant, in the composer, the response guard,
+  and the clipboard copy.
+- **New: "Show real values in this reply"** — restores decoys to the real
+  values inside the rendered answer itself (display-only DOM edit; if the site
+  re-renders, decoys simply return). The restored reply is never re-flagged as
+  leaked PII. "Copy reply with real values" stays for taking it elsewhere.
+
+### Added — right-click redact / mask / decoy
+
+Select any text in the prompt box → right-click → **Sether Shield** →
+*Redact selection* (`[redacted-N]`), *Mask selection* (`e***@***.com` style),
+or *Swap for a decoy* (realistic fake). Selections that look like a name get a
+name decoy; emails/phones/cards get type-correct decoys from the reserved
+fictional ranges; anything else gets a shape-preserving scramble. Every
+replacement goes through the same vault, so right-click swaps restore exactly
+like panel scrubs. Requires the new `contextMenus` permission — the only
+permission added, no new host access.
+
+### Added — the watchlist file
+
+Popup → Rules → **My Watchlist** → *Sample file* downloads
+`sether-watchlist.csv`. Fill it with your own values and how to handle each:
+
+```csv
+term,action,replacement,match_case,whole_word
+Godfrey Lebo,decoy,John Doe,no,yes
+Raeven Company,redact,[my-company],no,yes
++2348031234567,decoy,,no,yes
+```
+
+Import it and every future prompt on your protected sites is checked for
+those terms; each one is replaced per its own action (auto-generated when
+`replacement` is empty) and restores like everything else. Terms are matched
+literally (regex-escaped — an imported file can never inject a pattern),
+whole-word by default, case-insensitive by default. Stored in
+`chrome.storage.local` on this device only — that is the point: your list
+must survive restarts to keep protecting you. JSON arrays are accepted too.
+
+### Testing
+
+24 new watchlist unit checks, 9 reformatted-echo/ordering restore regressions,
+and 8 new e2e scenarios driving real Chrome: context-action decoy end-to-end,
+vault persistence across a reload with restore through the actual panel UI,
+and watchlist import applying its per-file action live.
+
 ## 0.4.0 — 2026-08-13
 
 Decoy mode, restore, and the detection gaps from the field report. Built on

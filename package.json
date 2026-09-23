@@ -1,14 +1,14 @@
 {
   "name": "sether-shield",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
-  "description": "Sether Shield \u2014 a browser extension that catches personal data in your prompt before it reaches ChatGPT, Claude, or Gemini. 100% local.",
+  "description": "Sether Shield — a browser extension that catches personal data in your prompt before it reaches ChatGPT, Claude, or Gemini. 100% local.",
   "scripts": {
     "build": "node build.mjs",
     "watch": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "test": "node test/detector.test.mjs && node test/decoy-restore.test.mjs",
+    "test": "node test/detector.test.mjs && node test/decoy-restore.test.mjs && node test/terms.test.mjs",
     "test:e2e": "node test/lifecycle.e2e.mjs",
     "package": "npm run build && node package.mjs"
   },

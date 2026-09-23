@@ -172,6 +172,96 @@ try {
   await setAllowedSites(sw, ['https://chatgpt.com']);
   await settle();
   ok('off-allowlist: composer is not scanned', (await detectsPII(page, 'ssn 123-45-6789')) === false);
+
+  // ── 8. Context-menu action: decoy the selected text ────────────────────────
+  // Native menus can't be clicked from puppeteer; we enter one step downstream
+  // (the SW → content message the menu click produces), which still exercises
+  // selection resolution, replacement, vault recording, and the composer write.
+  await setAllowedSites(sw, ['https://chatgpt.com', ORIGIN]);
+  await settle();
+
+  const tabId = await sw.evaluate(async (origin) => {
+    const tabs = await chrome.tabs.query({});
+    return tabs.find((t) => t.url?.startsWith(origin))?.id ?? null;
+  }, ORIGIN);
+  ok('ctx: found the test tab from the worker', tabId !== null);
+
+  await page.evaluate(() => {
+    const el = document.querySelector('#prompt-textarea');
+    el.textContent = 'my email is emory@gmail.com thanks';
+    const node = el.firstChild;
+    const range = document.createRange();
+    range.setStart(node, 12);
+    range.setEnd(node, 27); // "emory@gmail.com"
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
+  await sw.evaluate(
+    (id) => chrome.tabs.sendMessage(id, { action: 'contextAction', mode: 'decoy', selectionText: 'emory@gmail.com' }),
+    tabId,
+  );
+  await settle();
+
+  const afterDecoy = await page.evaluate(() => document.querySelector('#prompt-textarea').textContent);
+  ok('ctx decoy: original email gone from composer', !afterDecoy.includes('emory@gmail.com'));
+  ok('ctx decoy: realistic decoy email inserted (reserved example domain)', /@example\.(com|org|net)/.test(afterDecoy));
+  ok('ctx decoy: surrounding prompt text untouched',
+     afterDecoy.startsWith('my email is ') && afterDecoy.includes('thanks'));
+  const decoyEmail = afterDecoy.match(/\S+@example\.\S+/)?.[0] ?? '';
+
+  // ── 9. Restore vault survives a page reload (chrome.storage.session) ───────
+  const vault = await sw.evaluate(() => chrome.storage.session.get('sessionVault'));
+  const vaultEntries = vault?.sessionVault?.entries ?? {};
+  ok('vault: decoy → original persisted to memory-only session storage',
+     vaultEntries[decoyEmail]?.o === 'emory@gmail.com');
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await settle(1200);
+
+  // Simulate the AI echoing the decoy back after the reload, then restore it
+  // through the real panel UI — the exact journey that used to fail.
+  await page.evaluate((decoy) => {
+    const el = document.querySelector('#prompt-textarea');
+    el.textContent = `reply mentions ${decoy} somewhere`;
+    el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+  }, decoyEmail);
+  await settle(1400);
+
+  const restoredText = await page.evaluate(() => {
+    const root = document.querySelector('#sether-shield-host')?.shadowRoot;
+    if (!root) return 'NO-HOST';
+    const pill = root.querySelector('.pill');
+    pill.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    const btn = root.querySelector('.restore');
+    if (!btn) return 'NO-RESTORE-BTN';
+    btn.click();
+    return new Promise((r) => setTimeout(() => r(document.querySelector('#prompt-textarea').textContent), 300));
+  });
+  ok('vault: restore works AFTER a reload (panel → real value back)',
+     restoredText === 'reply mentions emory@gmail.com somewhere');
+
+  // ── 10. Watchlist import: per-term action applies live ─────────────────────
+  await sw.evaluate(
+    (terms) => new Promise((r) => chrome.storage.local.set({ customTerms: terms }, r)),
+    [{ id: 'w1', term: 'Raeven Company', action: 'redact', replacement: '[my-company]',
+       matchCase: false, wholeWord: true, enabled: true }],
+  );
+  await settle();
+
+  ok('watchlist: imported term detected while typing',
+     (await detectsPII(page, 'we are shipping Raeven Company work today')) === true);
+
+  const afterScrub = await page.evaluate(() => {
+    const root = document.querySelector('#sether-shield-host')?.shadowRoot;
+    const scrub = root?.querySelector('.scrub');
+    if (!scrub) return 'NO-SCRUB-BTN';
+    scrub.click();
+    return new Promise((r) => setTimeout(() => r(document.querySelector('#prompt-textarea').textContent), 300));
+  });
+  ok('watchlist: scrub applies the per-file action ([my-company])',
+     afterScrub.includes('[my-company]') && !afterScrub.includes('Raeven Company'));
 } finally {
   await browser.close();
   server.close();

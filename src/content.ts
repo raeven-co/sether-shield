@@ -10,8 +10,17 @@
 //  • AI Response Guard (F3) — scans AI replies for echoed pasted PII
 //  • Shield Score events (F4) — fires exposure events on paste/scrub
 
-import { detect, labelFor, maskValue, applyCustomRules, type Match } from './detector.js';
+import {
+  detect,
+  labelFor,
+  maskValue,
+  applyCustomRules,
+  applyCustomTerms,
+  termForType,
+  type Match,
+} from './detector.js';
 import { AliasVault, suggestAliases } from '@raeven-co/sether/browser';
+import { flexPattern, containsReplacement, restoreWithPairs } from './restore-utils.js';
 import {
   isSiteEnabled,
   bumpStats,
@@ -19,8 +28,11 @@ import {
   loadTranslations,
   translate,
   getCustomRules,
+  getCustomTerms,
   getSettings,
   setSettings,
+  loadSessionVault,
+  saveSessionVault,
 } from './storage.js';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -83,6 +95,12 @@ const FALLBACK: Record<string, string> = {
   copiedRealValues: 'Copied with real values',
   copyFailed: 'Copy failed',
   responseGuardIntro: 'Review this AI reply before copying it anywhere.',
+  showRealValues: 'Show real values in this reply',
+  restoredInReply: 'Restored $1 value(s) in the reply',
+  nothingToRestore: 'Nothing to restore here',
+  selectionScrubbed: 'Replaced with $1',
+  selectionNotEditable: 'Select text inside the prompt box first',
+  watchlistApplied: 'Watchlist updated',
 };
 
 /** Get an i18n message, falling back to English hardcoded strings. */
@@ -196,12 +214,41 @@ function matchKey(m: Match): string {
 
 /**
  * Every replacement actually written into a page this session:
- * replacement → original. First writer wins (a later identical mask for a
- * different original stays unrestorable rather than mis-restoring). Unlike the
- * vault, entries here are never re-pointed, so a decoy that was applied and
- * later superseded by a new pick still restores correctly.
+ * replacement → { original, type }. First writer wins (a later identical mask
+ * for a different original stays unrestorable rather than mis-restoring).
+ * Unlike the vault, entries here are never re-pointed, so a decoy that was
+ * applied and later superseded by a new pick still restores correctly.
+ *
+ * Mirrored into chrome.storage.session (memory-only, never disk) so restore
+ * still works after a tab reload or SPA navigation — the reply usually arrives
+ * long after the scrub, and before this mirror existed a refresh in between
+ * stranded every decoy already sent.
  */
-const replacementLog = new Map<string, string>();
+const replacementLog = new Map<string, { original: string; type: string }>();
+
+/** Debounced write-through of replacementLog to chrome.storage.session. */
+let vaultSaveTimer: ReturnType<typeof setTimeout> | undefined;
+function persistVault(): void {
+  clearTimeout(vaultSaveTimer);
+  vaultSaveTimer = setTimeout(() => {
+    saveSessionVault(replacementLog).catch(() => {});
+  }, 200);
+}
+
+/** Hydrate the in-page vault from the session mirror (called once at boot). */
+async function hydrateVault(): Promise<void> {
+  try {
+    const stored = await loadSessionVault();
+    for (const [replacement, e] of stored) {
+      if (!replacementLog.has(replacement)) {
+        replacementLog.set(replacement, e);
+        aliasVault.set(e.original, replacement, e.type);
+      }
+    }
+  } catch {
+    /* memory-only mode */
+  }
+}
 
 /**
  * Values we already swapped in are not PII — a decoy email is detector-visible
@@ -211,16 +258,54 @@ function isAppliedReplacement(value: string): boolean {
   return replacementLog.has(value) || aliasVault.originalOf(value) !== undefined;
 }
 
+/** 1–3 capitalised words, letters only — treat as a person/org name so decoys
+ *  come from the realistic name pool instead of shape-scrambled gibberish. */
+function looksLikeName(s: string): boolean {
+  return /^[\p{Lu}][\p{L}''.-]*(?:\s+[\p{Lu}][\p{L}''.-]*){0,2}$/u.test(s.trim());
+}
+
+/** Best alias type for a value whose detector type carries no alias shape
+ *  (watchlist terms, right-click selections): re-detect to see whether the
+ *  value IS a known PII shape, else fall back to NAME for name-looking text. */
+function aliasTypeFor(value: string): string {
+  const inner = detect(value);
+  const whole = inner.find((m) => m.value.trim() === value.trim());
+  if (whole) return whole.type;
+  if (looksLikeName(value)) return 'NAME';
+  return 'SELECTION'; // unknown → shape-preserving randomisation in the engine
+}
+
 /** The decoy standing in for this match: the user's pick, else a stable
  *  generated one (same original always gets the same decoy this session). */
 function decoyFor(m: Match): string {
   const chosen = chosenDecoys.get(matchKey(m));
   if (chosen) return chosen;
-  return aliasVault.aliasFor(m.type, m.value);
+  const type = termForType(m.type) ? aliasTypeFor(m.value) : m.type;
+  return aliasVault.aliasFor(type, m.value);
 }
 
-/** What scrubbing would insert for this match under the current mode. */
+/** Sequence for unique `[redacted-N]` placeholders (restorable via the vault). */
+let redactCounter = 0;
+function nextRedactPlaceholder(): string {
+  let p: string;
+  do {
+    redactCounter++;
+    p = `[redacted-${redactCounter}]`;
+  } while (replacementLog.has(p));
+  return p;
+}
+
+/** What scrubbing would insert for this match under the current mode.
+ *  Watchlist terms carry their own per-file action, which overrides the
+ *  global mask/decoy mode — that is the contract of the imported file. */
 function replacementFor(m: Match): string {
+  const term = termForType(m.type);
+  if (term) {
+    if (term.replacement && term.replacement !== m.value) return term.replacement;
+    if (term.action === 'decoy') return decoyFor(m);
+    if (term.action === 'redact') return redactPlaceholderFor(m.value);
+    return maskValue(m.value, aliasTypeFor(m.value));
+  }
   return aliasMode ? decoyFor(m) : maskValue(m.value, m.type);
 }
 
@@ -240,24 +325,24 @@ function suggestionsFor(m: Match): string[] {
  *  first mapping wins and the second stays unrestorable-by-text-swap. */
 function recordReplacement(original: string, replacement: string, type: string): void {
   if (original === replacement) return;
-  if (!replacementLog.has(replacement)) replacementLog.set(replacement, original);
+  if (!replacementLog.has(replacement)) replacementLog.set(replacement, { original, type });
   aliasVault.set(original, replacement, type);
+  persistVault();
 }
 
 /** All restorable pairs, longest replacement first so substring replacements
  *  cannot clobber a longer one during substitution. */
 function restorePairs(): [replacement: string, original: string][] {
-  return [...replacementLog.entries()].sort((a, b) => b[0].length - a[0].length);
+  return [...replacementLog.entries()]
+    .map(([replacement, e]) => [replacement, e.original] as [string, string])
+    .sort((a, b) => b[0].length - a[0].length);
 }
 
-/** Swap every logged replacement in `text` back to its original value. */
+/** Swap every logged replacement in `text` back to its original value.
+ *  Whitespace-tolerant so decoys reformatted by the AI's renderer restore too
+ *  (see restore-utils.ts for the failure mode this prevents). */
 function restoreText(text: string): string {
-  let out = text;
-  for (const [replacement, original] of restorePairs()) {
-    if (replacement.length === 0) continue;
-    out = out.split(replacement).join(original);
-  }
-  return out;
+  return restoreWithPairs(text, restorePairs());
 }
 
 /**
@@ -270,9 +355,9 @@ function sweepRemaining(el: HTMLElement): void {
   if (replacementLog.size === 0) return;
   const text = getText(el);
   let swept = text;
-  for (const [replacement, original] of replacementLog.entries()) {
-    if (original.length < 4) continue; // too short to sweep safely ("Al", "Bo")
-    swept = swept.split(original).join(replacement);
+  for (const [replacement, e] of replacementLog.entries()) {
+    if (e.original.length < 4) continue; // too short to sweep safely ("Al", "Bo")
+    swept = swept.split(e.original).join(replacement);
   }
   if (swept !== text) setText(el, swept);
 }
@@ -738,13 +823,132 @@ function doRestore(): void {
   }
 }
 
+/** Existing `[redacted-N]` placeholder for a value, else a fresh unique one. */
+function redactPlaceholderFor(value: string): string {
+  for (const [replacement, e] of replacementLog) {
+    if (e.original === value && /^\[redacted-\d+\]$/.test(replacement)) return replacement;
+  }
+  return nextRedactPlaceholder();
+}
+
+// ── Context menu action (right-click → Sether Shield → redact/mask/decoy) ─────
+
+/** The deepest active element, chased through open shadow roots. */
+function deepActiveElement(): Element | null {
+  let el: Element | null = document.activeElement;
+  while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement;
+  return el;
+}
+
+/** Nearest editor element containing `node`, or null. */
+function editorContaining(node: Node | null): HTMLElement | null {
+  let el: Node | null = node;
+  while (el) {
+    if (el instanceof HTMLElement && isEditor(el) && !isInsideShield(el)) return el;
+    el = el.parentNode instanceof Node ? el.parentNode : null;
+  }
+  return null;
+}
+
+/**
+ * Replace the user's current selection (or, if focus was lost to the menu,
+ * the first occurrence of `menuText` in the active editor) with a redaction,
+ * mask, or decoy. Everything goes through the same vault as panel scrubs, so
+ * right-click replacements restore exactly like any other.
+ */
+function handleContextAction(mode: 'redact' | 'mask' | 'decoy', menuText: string): void {
+  if (!activated || !globalEnabled || !siteEnabled) return;
+
+  const buildReplacement = (value: string): { replacement: string; type: string } => {
+    const type = aliasTypeFor(value);
+    if (mode === 'redact') return { replacement: redactPlaceholderFor(value), type };
+    if (mode === 'mask') return { replacement: maskValue(value, type), type };
+    return { replacement: aliasVault.aliasFor(type, value), type };
+  };
+
+  const finish = (el: HTMLElement, value: string, replacement: string, type: string): void => {
+    recordReplacement(value, replacement, type);
+    sweepRemaining(el);
+    addRedactionRecord({
+      pageUrl: location.origin,
+      category: mode === 'redact' ? 'redacted' : labelFor(type),
+      redactedValue: replacement,
+      timestamp: Date.now(),
+      source: 'typed',
+    }).catch(() => {});
+    bumpStats(1).catch(() => {});
+    shieldUI?.toastText(msg('selectionScrubbed', replacement));
+    setTimeout(refresh, 50);
+  };
+
+  // Path 1: textarea/input with a live selection (survives the right-click).
+  const ae = deepActiveElement();
+  if ((ae instanceof HTMLTextAreaElement || ae instanceof HTMLInputElement) && !isInsideShield(ae)) {
+    const start = ae.selectionStart ?? 0;
+    const end = ae.selectionEnd ?? 0;
+    if (end > start) {
+      const value = ae.value.slice(start, end).trim();
+      if (value) {
+        const { replacement, type } = buildReplacement(value);
+        // Splice exactly the trimmed span so edge whitespace survives.
+        const innerStart = start + ae.value.slice(start, end).indexOf(value);
+        setText(ae, ae.value.slice(0, innerStart) + replacement + ae.value.slice(innerStart + value.length));
+        finish(ae, value, replacement, type);
+        return;
+      }
+    }
+  }
+
+  // Path 2: contenteditable with a live selection.
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    const el = editorContaining(range.commonAncestorContainer);
+    const value = sel.toString().trim();
+    if (el && value) {
+      const { replacement, type } = buildReplacement(value);
+      el.focus();
+      const ok = document.execCommand('insertText', false, replacement);
+      if (!ok) {
+        // execCommand refused (some editors) — positional fallback.
+        const text = getText(el);
+        const idx = text.indexOf(value);
+        if (idx < 0 || !replaceMatchInElement(el, { type, value, start: idx, end: idx + value.length }, replacement)) {
+          return;
+        }
+      }
+      finish(el, value, replacement, type);
+      return;
+    }
+  }
+
+  // Path 3: focus was lost to the menu — fall back to Chrome's reported
+  // selection text, located in the active editor.
+  const fallbackValue = menuText.trim();
+  const el = activeEditor();
+  if (!el || !fallbackValue) {
+    shieldUI?.toastText(msg('selectionNotEditable'));
+    return;
+  }
+  const text = getText(el);
+  const idx = text.indexOf(fallbackValue);
+  if (idx < 0) {
+    shieldUI?.toastText(msg('selectionNotEditable'));
+    return;
+  }
+  const { replacement, type } = buildReplacement(fallbackValue);
+  if (replaceMatchInElement(el, { type, value: fallbackValue, start: idx, end: idx + fallbackValue.length }, replacement)) {
+    finish(el, fallbackValue, replacement, type);
+  }
+}
+
 /** How many logged replacements are currently present in the editor text. */
 function restorableCount(el: HTMLElement | null): number {
   if (!el || replacementLog.size === 0) return 0;
   const text = getText(el);
   let n = 0;
   for (const replacement of replacementLog.keys()) {
-    if (text.includes(replacement)) n++;
+    if (containsReplacement(text, replacement)) n++;
   }
   return n;
 }
@@ -788,14 +992,55 @@ interface DecoyEcho {
   original: string;
 }
 
-/** Which of this session's decoys appear in the given reply text. */
+/** Which of this session's decoys appear in the given reply text.
+ *  Whitespace-tolerant: the reply may render a decoy with line breaks or
+ *  non-breaking spaces between its words. */
 function decoyEchoesIn(text: string): DecoyEcho[] {
   const out: DecoyEcho[] = [];
-  for (const [replacement, original] of replacementLog.entries()) {
+  for (const [replacement, e] of replacementLog.entries()) {
     if (responseGuardDismissed.has(`DECOY:${replacement}`)) continue;
-    if (text.includes(replacement)) out.push({ alias: replacement, original });
+    if (containsReplacement(text, replacement)) out.push({ alias: replacement, original: e.original });
   }
   return out;
+}
+
+/**
+ * Swap decoys back to real values INSIDE a rendered AI reply, via DOM Ranges
+ * (handles decoys split across text nodes / formatting). The element is marked
+ * with data-sether-restored so the observer never re-flags the now-visible
+ * originals as leaked PII. If the host SPA re-renders the message the decoys
+ * simply come back — nothing breaks.
+ */
+function restoreInElement(el: HTMLElement): number {
+  let restored = 0;
+  for (const [replacement, original] of restorePairs()) {
+    if (replacement.length === 0) continue;
+    // Re-walk after every applied pair: each Range edit reshapes the node map.
+    let guard = 0;
+    for (;;) {
+      if (++guard > 200) break; // defensive bound, never loop a hostile DOM
+      const { text, map } = getDOMTextAndMap(el);
+      const re = flexPattern(replacement);
+      if (!re) break;
+      const m = re.exec(text);
+      if (!m || m.index == null) break;
+      const startPos = map[m.index];
+      const endPos = map[m.index + m[0].length - 1];
+      if (!startPos || !endPos || endPos.node.nodeType !== Node.TEXT_NODE) break;
+      try {
+        const range = document.createRange();
+        range.setStart(startPos.node, startPos.offset);
+        range.setEnd(endPos.node, endPos.offset + 1);
+        range.deleteContents();
+        range.insertNode(document.createTextNode(original));
+        restored++;
+      } catch {
+        break;
+      }
+    }
+  }
+  if (restored > 0) el.setAttribute('data-sether-restored', '1');
+  return restored;
 }
 
 /** Show an in-panel response guard prompt when echoed PII or decoys are found. */
@@ -836,6 +1081,10 @@ function initResponseGuard(): void {
       for (const sel of AI_RESPONSE_SELECTORS) {
         const nodes = document.querySelectorAll<HTMLElement>(sel);
         nodes.forEach((node) => {
+          // A reply the user restored in place now legitimately shows the
+          // originals — never re-flag it (that loop was a break-everything bug
+          // waiting to happen: restore → detect originals → alert → repeat).
+          if (node.closest('[data-sether-restored]')) return;
           const text = node.textContent ?? '';
           if (!text.trim()) return;
           // Decoys the AI echoed back are EXPECTED — surface them via the
@@ -1339,7 +1588,8 @@ class ShieldUI {
 
     const copyRestoredHtml =
       decoys.length > 0
-        ? `<button class="rg-copy-restored" type="button">↩ ${escapeHtml(msg('copyRealValues'))}</button>`
+        ? `<button class="rg-restore-inplace" type="button">👁 ${escapeHtml(msg('showRealValues'))}</button>
+           <button class="rg-copy-restored" type="button">↩ ${escapeHtml(msg('copyRealValues'))}</button>`
         : '';
 
     this.#panel.innerHTML = `
@@ -1348,6 +1598,18 @@ class ShieldUI {
       <ul class="list">${rowsHtml}</ul>
       ${copyRestoredHtml}
       ${getFooter()}`;
+
+    // Restore-in-place: swap decoys back to the real values inside the reply
+    // itself. Display-only DOM edit; if the site re-renders, decoys return.
+    this.#panel
+      .querySelector<HTMLButtonElement>('.rg-restore-inplace')
+      ?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const btn = e.currentTarget as HTMLButtonElement;
+        const n = restoreInElement(responseEl);
+        btn.textContent = n > 0 ? `✓ ${msg('restoredInReply', String(n))}` : msg('nothingToRestore');
+        btn.disabled = true;
+      });
 
     // Copy-with-real-values: clipboard gets the reply with every decoy swapped
     // back to its original. The restored text NEVER touches the page DOM.
@@ -1423,6 +1685,21 @@ class ShieldUI {
   #dismiss(m: Match): void {
     addDismissedKey(matchKey(m));
     refresh();
+  }
+
+  /** Show an arbitrary short text toast (context-menu feedback etc.). */
+  toastText(s: string): void {
+    if ((this.#toastEl as any).timeoutId) clearTimeout((this.#toastEl as any).timeoutId);
+    if ((this.#toastEl as any).displayTimeoutId) clearTimeout((this.#toastEl as any).displayTimeoutId);
+    this.#toastEl.textContent = s;
+    this.#toastEl.style.display = 'block';
+    (this.#toastEl as any).timeoutId = setTimeout(() => this.#toastEl.classList.add('show'), 10);
+    (this.#toastEl as any).timeoutId = setTimeout(() => {
+      this.#toastEl.classList.remove('show');
+      (this.#toastEl as any).displayTimeoutId = setTimeout(() => {
+        if (!this.#toastEl.classList.contains('show')) this.#toastEl.style.display = 'none';
+      }, 200);
+    }, 2600);
   }
 
   toast(n: number): void {
@@ -1570,6 +1847,15 @@ function registerRuntimeListeners(): void {
         // Reload custom rules into detector when changed from popup
         getCustomRules().then((rules) => applyCustomRules(rules));
       }
+      if (changes.customTerms) {
+        // Watchlist file imported/cleared from popup — live-reload detectors
+        getCustomTerms()
+          .then((terms) => {
+            applyCustomTerms(terms);
+            refresh();
+          })
+          .catch(() => {});
+      }
     });
   } catch { /* ignore */ }
 
@@ -1596,6 +1882,10 @@ function registerRuntimeListeners(): void {
         sendResponse({ ok: true });
       } else if (message.action === 'reloadSites') {
         void syncSiteState().then(() => sendResponse({ ok: true }));
+      } else if (message.action === 'contextAction') {
+        const mode = message.mode as 'redact' | 'mask' | 'decoy';
+        handleContextAction(mode, String(message.selectionText ?? ''));
+        sendResponse({ ok: true });
       }
       return true;
     });
@@ -1612,6 +1902,17 @@ async function boot(): Promise<void> {
       const rules = await getCustomRules();
       applyCustomRules(rules);
     } catch { /* ignore */ }
+
+    // Load watchlist terms (imported file) and apply to detector
+    try {
+      const terms = await getCustomTerms();
+      applyCustomTerms(terms);
+    } catch { /* ignore */ }
+
+    // Rehydrate the restore vault from the session mirror (memory-only,
+    // survives reloads) so replies to prompts scrubbed before a refresh
+    // can still be restored.
+    await hydrateVault();
 
     try {
       const v = await new Promise<Record<string, unknown>>((resolve) => {
@@ -1717,12 +2018,13 @@ const SHIELD_CSS = `
   .decoy-dot { background: #6d28d9; }
 
   /* Restore + copy-restored buttons */
-  .restore, .rg-copy-restored {
+  .restore, .rg-copy-restored, .rg-restore-inplace {
     width: 100%; height: 32px; border: 1px solid #e5e7eb; border-radius: 10px;
     background: #ffffff; color: #374151; font-weight: 600; font-size: 12px;
     cursor: pointer; transition: background-color .15s; margin-top: 8px;
   }
-  .restore:hover, .rg-copy-restored:hover { background: #f9fafb; border-color: #d1d5db; }
+  .restore:hover, .rg-copy-restored:hover, .rg-restore-inplace:hover { background: #f9fafb; border-color: #d1d5db; }
+  .rg-restore-inplace:disabled { opacity: .7; cursor: default; }
   
   .match-actions { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
   .match-actions button {

@@ -20,10 +20,14 @@ import {
   removeAllowedSite,
   resetAllowedSites,
   DEFAULT_ALLOWED_SITES_LIST,
+  getCustomTerms,
+  setCustomTerms,
+  deleteCustomTerm,
 } from './storage.js';
 
 import type { CustomRule } from './types.js';
 import { isRegexSafe } from './detector.js';
+import { parseTermsFile, sampleTermsFile, type CustomTerm } from './terms.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -812,5 +816,113 @@ resetSitesBtn.addEventListener('click', async () => {
     await renderSites();
   }
 });
+
+// ── Watchlist (imported terms file) ────────────────────────────────────────────
+
+const dlSampleBtn = document.getElementById('dlSampleBtn') as HTMLButtonElement;
+const importTermsBtn = document.getElementById('importTermsBtn') as HTMLButtonElement;
+const termsFileIn = document.getElementById('termsFileIn') as HTMLInputElement;
+const termsList = document.getElementById('termsList') as HTMLDivElement;
+const termsEmpty = document.getElementById('termsEmpty') as HTMLDivElement;
+const termsMsg = document.getElementById('termsMsg') as HTMLDivElement;
+
+const TERM_ACTION_BADGE: Record<CustomTerm['action'], string> = {
+  redact: '⬛ redact',
+  mask: '🛡 mask',
+  decoy: '🎭 decoy',
+};
+
+function showTermsMsg(text: string, kind: 'success' | 'error' | 'info'): void {
+  termsMsg.textContent = text;
+  termsMsg.style.color =
+    kind === 'success' ? 'var(--green, #10b981)' : kind === 'error' ? '#ef4444' : 'var(--text-muted)';
+}
+
+async function renderTerms(): Promise<void> {
+  const terms = await getCustomTerms();
+  termsList.querySelectorAll('.rule-card').forEach((el) => el.remove());
+  termsEmpty.style.display = terms.length === 0 ? '' : 'none';
+
+  for (const t of terms) {
+    const card = document.createElement('div');
+    card.className = 'rule-card';
+
+    const body = document.createElement('div');
+    body.className = 'rule-body';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'rule-title';
+    const textSpan = document.createElement('span');
+    textSpan.className = 'rule-title-txt';
+    textSpan.textContent = t.term;
+    textSpan.title = t.term;
+    nameEl.appendChild(textSpan);
+    const badge = document.createElement('span');
+    badge.className = 'rule-badge';
+    badge.textContent = TERM_ACTION_BADGE[t.action];
+    nameEl.appendChild(badge);
+
+    const desc = document.createElement('div');
+    desc.className = 'rule-desc';
+    desc.textContent = t.replacement ? `→ ${t.replacement}` : '→ auto-generated';
+
+    body.appendChild(nameEl);
+    body.appendChild(desc);
+
+    const actions = document.createElement('div');
+    actions.className = 'rule-actions';
+    const del = document.createElement('button');
+    del.className = 'rule-del';
+    del.textContent = '×';
+    del.title = 'Remove from watchlist';
+    del.addEventListener('click', async () => {
+      await deleteCustomTerm(t.id);
+      await renderTerms();
+    });
+    actions.appendChild(del);
+
+    card.appendChild(body);
+    card.appendChild(actions);
+    termsList.appendChild(card);
+  }
+}
+
+dlSampleBtn.addEventListener('click', () => {
+  const blob = new Blob([sampleTermsFile()], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'sether-watchlist.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  showTermsMsg('Sample downloaded — fill it in, then Import file.', 'info');
+});
+
+importTermsBtn.addEventListener('click', () => termsFileIn.click());
+
+termsFileIn.addEventListener('change', async () => {
+  const file = termsFileIn.files?.[0];
+  termsFileIn.value = '';
+  if (!file) return;
+  if (file.size > 512 * 1024) {
+    showTermsMsg('File too large (512 KB max).', 'error');
+    return;
+  }
+  try {
+    const content = await file.text();
+    const { terms, errors } = parseTermsFile(content);
+    if (terms.length === 0) {
+      showTermsMsg(errors[0] ?? 'No terms found in the file.', 'error');
+      return;
+    }
+    await setCustomTerms(terms);
+    await renderTerms();
+    const errNote = errors.length > 0 ? ` (${errors.length} line(s) skipped)` : '';
+    showTermsMsg(`✓ ${terms.length} term(s) imported${errNote}. Active on your protected sites now.`, 'success');
+  } catch {
+    showTermsMsg('Could not read that file.', 'error');
+  }
+});
+
+renderTerms().catch(() => {});
 
 init();

@@ -24,11 +24,19 @@ This is the **Grammarly pattern**, not a network proxy:
   suggestion chips so you pick the decoy you like; the same value always gets
   the same decoy within a session.
 - Changed your mind? **Restore originals** puts the real values back in one
-  tap — even after you've edited around them. The vault mapping decoys to real
-  values stays in this tab's memory only, never on disk.
+  tap — even after you've edited around them, and even after a page refresh.
+  The vault mapping decoys to real values lives in `chrome.storage.session`:
+  memory-only, never written to disk, wiped when the browser closes.
 - When the AI **echoes your decoy back** in its reply, the Response Guard
-  offers **Copy reply with real values** — your clipboard gets the restored
-  text; the page itself never sees it.
+  offers **Show real values in this reply** (restores them in place,
+  display-only — matching is whitespace-tolerant, so a decoy the renderer
+  split across lines still restores) and **Copy reply with real values**.
+- **Right-click any selected text** in the prompt box → Sether Shield →
+  redact (`[redacted-N]`), mask, or swap for a decoy. Same vault, same restore.
+- **My Watchlist** (popup → Rules): download the sample CSV, fill in your own
+  names/emails/IDs with a per-term action (redact / mask / decoy + optional
+  fixed replacement), import it — every future prompt is checked for those
+  terms automatically.
 - A non-blocking nudge appears if you hit send with PII still present.
 
 **What it deliberately does NOT do:**
@@ -36,12 +44,13 @@ This is the **Grammarly pattern**, not a network proxy:
 - It does **not** intercept the network request. Manifest V3 cannot read request
   bodies, and anything that monkey-patches the page's `fetch` silently breaks or
   leaks when the site changes. We operate on the input box instead — robust and honest.
-- It makes **zero network calls** and ships **no telemetry**. The only permission
-  is `storage` (for your on/off setting + local stats). All detection is in-page.
-- It does **not** rewrite the AI's reply. Restoring tokens inside the model's
-  response is the library/gateway's job (that's where the durable vault lives).
-  In the extension you choose what to scrub, and you can **undo a scrub locally**
-  before you send. The undo buffer is in-memory only and cleared on reload.
+- It makes **zero network calls** and ships **no telemetry**. Permissions are
+  `storage` (settings + local stats + your imported watchlist), `activeTab`,
+  and `contextMenus` (the right-click entries). All detection is in-page.
+- Reply-side restore is **display-only and session-scoped**. "Show real values
+  in this reply" edits what YOU see; nothing restored is ever sent anywhere.
+  Durable, server-side token restore across devices remains the
+  library/gateway's job (that's where the durable vault lives).
 
 ## Install (developer / unpacked)
 
@@ -67,7 +76,9 @@ email — the shield turns orange.
 ## Roadmap
 
 - [x] Undo a scrub in the input box (local, ephemeral) — shipped in 0.2.0
-- [ ] Best-effort token **restore** in the reply pane (experimental; opt-in)
+- [x] Best-effort token **restore** in the reply pane — shipped in 0.5.0
+- [x] Right-click redact/mask/decoy on selected text — shipped in 0.5.0
+- [x] Watchlist file import (per-term redact/mask/decoy) — shipped in 0.5.0
 - [ ] "Scrub on send" strict mode (block + confirm) as an option
 - [ ] Brand icons (export from the Sether bird SVG to 16/48/128 PNG)
 - [ ] Firefox build (MV3 parity)

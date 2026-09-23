@@ -43,7 +43,10 @@ export const LOCALES: Record<string, Record<string, string>> = {
       "copiedRealValues": "Copied with real values",
       "copyFailed": "Copy failed",
       "responseGuardIntro": "Review this AI reply before copying it anywhere.",
-      "decoyModeLabel": "Decoy mode"
+      "decoyModeLabel": "Decoy mode",
+      "ctxRedact": "Redact selection",
+      "ctxMask": "Mask selection",
+      "ctxDecoy": "Swap for a decoy"
     },
     "ar": {
       "extName": "Sether Shield — حماية البيانات للدردشة مع الذكاء الاصطناعي",
@@ -87,7 +90,10 @@ export const LOCALES: Record<string, Record<string, string>> = {
       "copiedRealValues": "تم النسخ بالقيم الحقيقية",
       "copyFailed": "فشل النسخ",
       "responseGuardIntro": "راجع رد الذكاء الاصطناعي قبل نسخه.",
-      "decoyModeLabel": "وضع التمويه"
+      "decoyModeLabel": "وضع التمويه",
+      "ctxRedact": "تنقيح التحديد",
+      "ctxMask": "إخفاء التحديد",
+      "ctxDecoy": "استبدال بقيمة تمويهية"
     },
     "de": {
       "extName": "Sether Shield — PII-Schutz für KI-Chat",
@@ -131,7 +137,10 @@ export const LOCALES: Record<string, Record<string, string>> = {
       "copiedRealValues": "Mit echten Werten kopiert",
       "copyFailed": "Kopieren fehlgeschlagen",
       "responseGuardIntro": "Prüfen Sie diese KI-Antwort, bevor Sie sie kopieren.",
-      "decoyModeLabel": "Köder-Modus"
+      "decoyModeLabel": "Köder-Modus",
+      "ctxRedact": "Auswahl schwärzen",
+      "ctxMask": "Auswahl maskieren",
+      "ctxDecoy": "Durch Köder ersetzen"
     },
     "es": {
       "extName": "Sether Shield — Protección de datos para IA",
@@ -175,7 +184,10 @@ export const LOCALES: Record<string, Record<string, string>> = {
       "copiedRealValues": "Copiado con valores reales",
       "copyFailed": "Error al copiar",
       "responseGuardIntro": "Revisa esta respuesta de IA antes de copiarla.",
-      "decoyModeLabel": "Modo señuelo"
+      "decoyModeLabel": "Modo señuelo",
+      "ctxRedact": "Censurar la selección",
+      "ctxMask": "Enmascarar la selección",
+      "ctxDecoy": "Sustituir por un señuelo"
     },
     "fr": {
       "extName": "Sether Shield — Protection des données pour IA",
@@ -219,7 +231,10 @@ export const LOCALES: Record<string, Record<string, string>> = {
       "copiedRealValues": "Copié avec les vraies valeurs",
       "copyFailed": "Échec de la copie",
       "responseGuardIntro": "Vérifiez cette réponse IA avant de la copier.",
-      "decoyModeLabel": "Mode leurre"
+      "decoyModeLabel": "Mode leurre",
+      "ctxRedact": "Caviarder la sélection",
+      "ctxMask": "Masquer la sélection",
+      "ctxDecoy": "Remplacer par un leurre"
     },
     "pt": {
       "extName": "Sether Shield — Proteção de dados para IA",
@@ -263,7 +278,10 @@ export const LOCALES: Record<string, Record<string, string>> = {
       "copiedRealValues": "Copiado com valores reais",
       "copyFailed": "Falha ao copiar",
       "responseGuardIntro": "Revise esta resposta da IA antes de copiá-la.",
-      "decoyModeLabel": "Modo isca"
+      "decoyModeLabel": "Modo isca",
+      "ctxRedact": "Ocultar a seleção",
+      "ctxMask": "Mascarar a seleção",
+      "ctxDecoy": "Trocar por um chamariz"
     },
     "zh_CN": {
       "extName": "Sether Shield — AI 聊天隐私保护",
@@ -307,6 +325,9 @@ export const LOCALES: Record<string, Record<string, string>> = {
       "copiedRealValues": "已复制真实值",
       "copyFailed": "复制失败",
       "responseGuardIntro": "复制前请检查此 AI 回复。",
-      "decoyModeLabel": "诱饵模式"
+      "decoyModeLabel": "诱饵模式",
+      "ctxRedact": "涂黑所选内容",
+      "ctxMask": "遮蔽所选内容",
+      "ctxDecoy": "替换为诱饵值"
     }
   };

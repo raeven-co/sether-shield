@@ -84,7 +84,8 @@ export type Message =
   | { action: 'triggerScan' }
   | { action: 'getStatus' }
   | { action: 'updateBadge'; count: number }
-  | { action: 'scanDocument' };
+  | { action: 'scanDocument' }
+  | { action: 'contextAction'; mode: 'redact' | 'mask' | 'decoy'; selectionText: string };
 
 export interface StatusResponse {
   matchCount: number;

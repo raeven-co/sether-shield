@@ -129,5 +129,14 @@
   },
   "decoyModeLabel": {
     "message": "Modo señuelo"
+  },
+  "ctxRedact": {
+    "message": "Censurar la selección"
+  },
+  "ctxMask": {
+    "message": "Enmascarar la selección"
+  },
+  "ctxDecoy": {
+    "message": "Sustituir por un señuelo"
   }
 }

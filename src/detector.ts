@@ -26,6 +26,7 @@ import {
 
 import { multilingualDetectors } from './multilingual.js';
 import { credentialDetectors } from './credentials.js';
+import { findTerm, TERM_TYPE_PREFIX, type CustomTerm } from './terms.js';
 
 export interface Match {
   type: string;
@@ -73,6 +74,7 @@ export function labelFor(type: string): string {
     const id = type.slice(7);
     return customRuleNames.get(id) || 'custom rule';
   }
+  if (type.startsWith(TERM_TYPE_PREFIX)) return 'watchlist';
   return FRIENDLY[type] ?? type.toLowerCase().replace(/_/g, ' ');
 }
 
@@ -234,6 +236,35 @@ export function isRegexSafe(pattern: string, flags: string): boolean {
 /** Runtime-mutable list of active custom detectors. Updated by loadCustomRules(). */
 let customDetectors: Detector[] = [];
 
+// ── Watchlist term detectors (imported from a user file) ─────────────────────
+
+/** Runtime-mutable list of active watchlist detectors. Updated by applyCustomTerms(). */
+let termDetectors: Detector[] = [];
+
+/** term id → the imported CustomTerm, for per-term replacement resolution. */
+export const termsById = new Map<string, CustomTerm>();
+
+/** Look up the imported term behind a `TERM:<id>` match type. */
+export function termForType(type: string): CustomTerm | undefined {
+  if (!type.startsWith(TERM_TYPE_PREFIX)) return undefined;
+  return termsById.get(type.slice(TERM_TYPE_PREFIX.length));
+}
+
+/** Call after loading CustomTerm[] from storage to update the live detector set. */
+export function applyCustomTerms(terms: CustomTerm[]): void {
+  termsById.clear();
+  for (const t of terms) termsById.set(t.id, t);
+
+  termDetectors = terms
+    .filter((t) => t.enabled)
+    .map((t) => ({
+      type: `${TERM_TYPE_PREFIX}${t.id}`,
+      detect(text: string) {
+        return findTerm(text, t);
+      },
+    }));
+}
+
 /** Call this after loading CustomRule[] from storage to update the live detector set. */
 export function applyCustomRules(rules: CustomRule[]): void {
   customRuleNames.clear();
@@ -267,7 +298,10 @@ function isAlreadyRedacted(value: string): boolean {
 
 export function detect(text: string): Match[] {
   const all: Match[] = [];
-  const allDetectors = [...DETECTORS, ...customDetectors];
+  // Watchlist terms first: the user configured those matches explicitly, so on
+  // an equal-span overlap (term "Godfrey Lebo" vs the NAME detector) the
+  // stable resolveOverlaps sort must keep the term's per-file action.
+  const allDetectors = [...termDetectors, ...DETECTORS, ...customDetectors];
   for (const d of allDetectors) {
     for (const m of d.detect(text)) {
       if (isAlreadyRedacted(m.value)) continue;

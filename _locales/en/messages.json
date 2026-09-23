@@ -129,5 +129,17 @@
   },
   "decoyModeLabel": {
     "message": "Decoy mode"
+  },
+  "ctxRedact": {
+    "message": "Redact selection",
+    "description": "Context menu: replace selection with [redacted-N]"
+  },
+  "ctxMask": {
+    "message": "Mask selection",
+    "description": "Context menu: replace selection with a masked version"
+  },
+  "ctxDecoy": {
+    "message": "Swap for a decoy",
+    "description": "Context menu: replace selection with a realistic decoy"
   }
 }

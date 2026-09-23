@@ -129,5 +129,14 @@
   },
   "decoyModeLabel": {
     "message": "诱饵模式"
+  },
+  "ctxRedact": {
+    "message": "涂黑所选内容"
+  },
+  "ctxMask": {
+    "message": "遮蔽所选内容"
+  },
+  "ctxDecoy": {
+    "message": "替换为诱饵值"
   }
 }
